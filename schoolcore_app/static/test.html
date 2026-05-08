@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>JS Test</title></head>
+<body>
+<h1 id="msg">Loading...</h1>
+<button onclick="document.getElementById('msg').textContent='ボタン動いた！✅'">クリックテスト</button>
+<div id="api-result">API test pending...</div>
+<script>
+document.getElementById('msg').textContent = 'JS動いています✅';
+fetch('/api/health')
+  .then(r => r.json())
+  .then(d => { document.getElementById('api-result').textContent = 'API OK: ' + JSON.stringify(d); })
+  .catch(e => { document.getElementById('api-result').textContent = 'API Error: ' + e.message; });
+</script>
+</body>
+</html>
