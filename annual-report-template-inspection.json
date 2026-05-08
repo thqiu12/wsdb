@@ -1,0 +1,1379 @@
+[
+  {
+    "file": "/Users/setsuiken/Desktop/工作/学生管理系统/年度終了報告-模板/リスト.xlsx",
+    "sheets": [
+      {
+        "title": "リスト",
+        "max_row": 222,
+        "max_column": 7,
+        "merged_ranges": [],
+        "values": [
+          {
+            "cell": "A2",
+            "value": "「該当要件」は、一の生徒に付きいずれかの要件を選択すること。"
+          },
+          {
+            "cell": "A4",
+            "value": "番号"
+          },
+          {
+            "cell": "B4",
+            "value": "氏名"
+          },
+          {
+            "cell": "C4",
+            "value": "在留カード番号"
+          },
+          {
+            "cell": "D4",
+            "value": "該当要件"
+          },
+          {
+            "cell": "E4",
+            "value": "合格試験及び点数等\n/進学先/就職先"
+          },
+          {
+            "cell": "F4",
+            "value": "試験受験番号，合格証明書番号，成績証明書番号等"
+          },
+          {
+            "cell": "G4",
+            "value": "課程修了\n年月日"
+          },
+          {
+            "cell": "A5",
+            "value": "1"
+          },
+          {
+            "cell": "B5",
+            "value": "西尔扎提·艾力(XIERZATI AILI)"
+          },
+          {
+            "cell": "C5",
+            "value": "UH89687691EA"
+          },
+          {
+            "cell": "D5",
+            "value": "就職"
+          },
+          {
+            "cell": "E5",
+            "value": "渋谷外語学院"
+          },
+          {
+            "cell": "G5",
+            "value": "2025/06/24"
+          },
+          {
+            "cell": "A6",
+            "value": "2"
+          },
+          {
+            "cell": "B6",
+            "value": "西尔扎提·艾力(XIERZATI AILI)"
+          },
+          {
+            "cell": "C6",
+            "value": "UH89687691EA"
+          },
+          {
+            "cell": "D6",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E6",
+            "value": "日本語能力試験  N2"
+          },
+          {
+            "cell": "F6",
+            "value": "N2A454204J"
+          },
+          {
+            "cell": "G6",
+            "value": "2025/06/24"
+          },
+          {
+            "cell": "A7",
+            "value": "3"
+          },
+          {
+            "cell": "B7",
+            "value": "艾力扎提·吾提库尔(AILIZHATI WUTIKUER)"
+          },
+          {
+            "cell": "C7",
+            "value": "UH14838780EA"
+          },
+          {
+            "cell": "D7",
+            "value": "就職"
+          },
+          {
+            "cell": "E7",
+            "value": "株式会社恒鋒"
+          },
+          {
+            "cell": "G7",
+            "value": "2025/09/29"
+          },
+          {
+            "cell": "A8",
+            "value": "4"
+          },
+          {
+            "cell": "B8",
+            "value": "武 雅楠(WU YANAN)"
+          },
+          {
+            "cell": "C8",
+            "value": "UH18733346EA"
+          },
+          {
+            "cell": "D8",
+            "value": "就職"
+          },
+          {
+            "cell": "E8",
+            "value": "以便以謝合同会社"
+          },
+          {
+            "cell": "G8",
+            "value": "2025/05/26（退）"
+          },
+          {
+            "cell": "A9",
+            "value": "5"
+          },
+          {
+            "cell": "B9",
+            "value": "武 雅楠(WU YANAN)"
+          },
+          {
+            "cell": "C9",
+            "value": "UH18733346EA"
+          },
+          {
+            "cell": "D9",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E9",
+            "value": "日本語能力試験  N2"
+          },
+          {
+            "cell": "F9",
+            "value": "N2A430747J"
+          },
+          {
+            "cell": "G9",
+            "value": "2025/05/26（退）"
+          },
+          {
+            "cell": "A10",
+            "value": "6"
+          },
+          {
+            "cell": "B10",
+            "value": "JONES DEVIN"
+          },
+          {
+            "cell": "C10",
+            "value": "UH60190376EA"
+          },
+          {
+            "cell": "D10",
+            "value": "就職"
+          },
+          {
+            "cell": "E10",
+            "value": "Robert Walters Japan K.K"
+          },
+          {
+            "cell": "G10",
+            "value": "2025/12/22"
+          },
+          {
+            "cell": "A11",
+            "value": "7"
+          },
+          {
+            "cell": "B11",
+            "value": "MC CREADIE ETHAN JAMES"
+          },
+          {
+            "cell": "C11",
+            "value": "UH81262966EA"
+          },
+          {
+            "cell": "D11",
+            "value": "就職"
+          },
+          {
+            "cell": "E11",
+            "value": "lighthouse"
+          },
+          {
+            "cell": "G11",
+            "value": "2025/12/22"
+          },
+          {
+            "cell": "A12",
+            "value": "8"
+          },
+          {
+            "cell": "B12",
+            "value": "MC CREADIE ETHAN JAMES"
+          },
+          {
+            "cell": "C12",
+            "value": "UH81262966EA"
+          },
+          {
+            "cell": "D12",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E12",
+            "value": "日本語能力試験  N3"
+          },
+          {
+            "cell": "F12",
+            "value": "N3A341174J"
+          },
+          {
+            "cell": "G12",
+            "value": "2025/12/22"
+          },
+          {
+            "cell": "A13",
+            "value": "9"
+          },
+          {
+            "cell": "B13",
+            "value": "KELHER ROK"
+          },
+          {
+            "cell": "C13",
+            "value": "SA66186049FA"
+          },
+          {
+            "cell": "D13",
+            "value": "就職"
+          },
+          {
+            "cell": "E13",
+            "value": "EZO CONSULTING GROUP株式会社"
+          },
+          {
+            "cell": "G13",
+            "value": "2025/04/21（退）"
+          },
+          {
+            "cell": "A14",
+            "value": "10"
+          },
+          {
+            "cell": "B14",
+            "value": "KELHER ROK"
+          },
+          {
+            "cell": "C14",
+            "value": "SA66186049FA"
+          },
+          {
+            "cell": "D14",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E14",
+            "value": "日本語能力試験  N2"
+          },
+          {
+            "cell": "F14",
+            "value": "N2A409335J"
+          },
+          {
+            "cell": "G14",
+            "value": "2025/04/21（退）"
+          },
+          {
+            "cell": "A15",
+            "value": "11"
+          },
+          {
+            "cell": "B15",
+            "value": "ISABEL TEO MANTING"
+          },
+          {
+            "cell": "C15",
+            "value": "UH48672713EA"
+          },
+          {
+            "cell": "D15",
+            "value": "就職"
+          },
+          {
+            "cell": "E15",
+            "value": "Coto world 株式会社"
+          },
+          {
+            "cell": "G15",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A16",
+            "value": "12"
+          },
+          {
+            "cell": "B16",
+            "value": "ISABEL TEO MANTING"
+          },
+          {
+            "cell": "C16",
+            "value": "UH48672713EA"
+          },
+          {
+            "cell": "D16",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E16",
+            "value": "日本語能力試験  N1"
+          },
+          {
+            "cell": "F16",
+            "value": "N1A343327J"
+          },
+          {
+            "cell": "G16",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A17",
+            "value": "13"
+          },
+          {
+            "cell": "B17",
+            "value": "BARBERA NAVARRO ALBERTO MIGUEL"
+          },
+          {
+            "cell": "C17",
+            "value": "UH69301614EA"
+          },
+          {
+            "cell": "D17",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E17",
+            "value": "日本語能力試験  N2"
+          },
+          {
+            "cell": "F17",
+            "value": "N2A481467J"
+          },
+          {
+            "cell": "G17",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A18",
+            "value": "14"
+          },
+          {
+            "cell": "B18",
+            "value": "DEMPSEY ALEX JOSEPH"
+          },
+          {
+            "cell": "C18",
+            "value": "UH16272757EA"
+          },
+          {
+            "cell": "D18",
+            "value": "就職"
+          },
+          {
+            "cell": "E18",
+            "value": "Baird Beer"
+          },
+          {
+            "cell": "G18",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A19",
+            "value": "15"
+          },
+          {
+            "cell": "B19",
+            "value": "余 澜(YU LAN)"
+          },
+          {
+            "cell": "C19",
+            "value": "UH69628154EA"
+          },
+          {
+            "cell": "D19",
+            "value": "進学"
+          },
+          {
+            "cell": "E19",
+            "value": "専修学校中央ゼミナール"
+          },
+          {
+            "cell": "G19",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A20",
+            "value": "16"
+          },
+          {
+            "cell": "B20",
+            "value": "吴 金洋(WU JINYANG)"
+          },
+          {
+            "cell": "C20",
+            "value": "UH21761273EA"
+          },
+          {
+            "cell": "D20",
+            "value": "進学"
+          },
+          {
+            "cell": "E20",
+            "value": "神戸大学"
+          },
+          {
+            "cell": "G20",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A21",
+            "value": "17"
+          },
+          {
+            "cell": "B21",
+            "value": "吴 金洋(WU JINYANG)"
+          },
+          {
+            "cell": "C21",
+            "value": "UH21761273EA"
+          },
+          {
+            "cell": "D21",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E21",
+            "value": "日本語能力試験  N1"
+          },
+          {
+            "cell": "F21",
+            "value": "N1A319856J"
+          },
+          {
+            "cell": "G21",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A22",
+            "value": "18"
+          },
+          {
+            "cell": "B22",
+            "value": "夏 一诺(XIA YINUO)"
+          },
+          {
+            "cell": "C22",
+            "value": "UH74004106EA"
+          },
+          {
+            "cell": "D22",
+            "value": "進学"
+          },
+          {
+            "cell": "E22",
+            "value": "日本大学"
+          },
+          {
+            "cell": "G22",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A23",
+            "value": "19"
+          },
+          {
+            "cell": "B23",
+            "value": "张 文谦(ZHANG WENQIAN)"
+          },
+          {
+            "cell": "C23",
+            "value": "UH77114971EA"
+          },
+          {
+            "cell": "D23",
+            "value": "進学"
+          },
+          {
+            "cell": "E23",
+            "value": "帝京大学"
+          },
+          {
+            "cell": "G23",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A24",
+            "value": "20"
+          },
+          {
+            "cell": "B24",
+            "value": "李 翱铮(LI AOZHENG)"
+          },
+          {
+            "cell": "C24",
+            "value": "UH92442145EA"
+          },
+          {
+            "cell": "D24",
+            "value": "進学"
+          },
+          {
+            "cell": "E24",
+            "value": "京都情報大学院大学"
+          },
+          {
+            "cell": "G24",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A25",
+            "value": "21"
+          },
+          {
+            "cell": "B25",
+            "value": "李 雨翰(LI YUHAN)"
+          },
+          {
+            "cell": "C25",
+            "value": "UH51390542EA"
+          },
+          {
+            "cell": "D25",
+            "value": "進学"
+          },
+          {
+            "cell": "E25",
+            "value": "専修学校中央ゼミナール"
+          },
+          {
+            "cell": "G25",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A26",
+            "value": "22"
+          },
+          {
+            "cell": "B26",
+            "value": "李 雨翰(LI YUHAN)"
+          },
+          {
+            "cell": "C26",
+            "value": "UH51390542EA"
+          },
+          {
+            "cell": "D26",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E26",
+            "value": "日本語能力試験  N1"
+          },
+          {
+            "cell": "F26",
+            "value": "N1A343772J"
+          },
+          {
+            "cell": "G26",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A27",
+            "value": "23"
+          },
+          {
+            "cell": "B27",
+            "value": "杨 卓凝(YANG ZHUONING)"
+          },
+          {
+            "cell": "C27",
+            "value": "UH22348530EA"
+          },
+          {
+            "cell": "D27",
+            "value": "進学"
+          },
+          {
+            "cell": "E27",
+            "value": "青山学院大学"
+          },
+          {
+            "cell": "G27",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A28",
+            "value": "24"
+          },
+          {
+            "cell": "B28",
+            "value": "杨 卓凝(YANG ZHUONING)"
+          },
+          {
+            "cell": "C28",
+            "value": "UH22348530EA"
+          },
+          {
+            "cell": "D28",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E28",
+            "value": "日本語能力試験  N1"
+          },
+          {
+            "cell": "F28",
+            "value": "N1A319360J"
+          },
+          {
+            "cell": "G28",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A29",
+            "value": "25"
+          },
+          {
+            "cell": "B29",
+            "value": "杨 安鸿(YANG ANHONG)"
+          },
+          {
+            "cell": "C29",
+            "value": "UH84540651EA"
+          },
+          {
+            "cell": "D29",
+            "value": "進学"
+          },
+          {
+            "cell": "E29",
+            "value": "上智大学"
+          },
+          {
+            "cell": "G29",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A30",
+            "value": "26"
+          },
+          {
+            "cell": "B30",
+            "value": "林 雨(LIN YU)"
+          },
+          {
+            "cell": "C30",
+            "value": "UH22014861EA"
+          },
+          {
+            "cell": "D30",
+            "value": "進学"
+          },
+          {
+            "cell": "E30",
+            "value": "広島大学"
+          },
+          {
+            "cell": "G30",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A31",
+            "value": "27"
+          },
+          {
+            "cell": "B31",
+            "value": "江 亚霖(JIANG YALIN)"
+          },
+          {
+            "cell": "C31",
+            "value": "UH87813494EA"
+          },
+          {
+            "cell": "D31",
+            "value": "進学"
+          },
+          {
+            "cell": "E31",
+            "value": "尚美学園大学"
+          },
+          {
+            "cell": "G31",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A32",
+            "value": "28"
+          },
+          {
+            "cell": "B32",
+            "value": "沈 泽毅(SHEN ZEYI)"
+          },
+          {
+            "cell": "C32",
+            "value": "UH00728921EA"
+          },
+          {
+            "cell": "D32",
+            "value": "進学"
+          },
+          {
+            "cell": "E32",
+            "value": "立教大学"
+          },
+          {
+            "cell": "G32",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A33",
+            "value": "29"
+          },
+          {
+            "cell": "B33",
+            "value": "洪 紫怡(HONG ZIYI)"
+          },
+          {
+            "cell": "C33",
+            "value": "UH86053006EA"
+          },
+          {
+            "cell": "D33",
+            "value": "進学"
+          },
+          {
+            "cell": "E33",
+            "value": "明治大学"
+          },
+          {
+            "cell": "G33",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A34",
+            "value": "30"
+          },
+          {
+            "cell": "B34",
+            "value": "洪 紫怡(HONG ZIYI)"
+          },
+          {
+            "cell": "C34",
+            "value": "UH86053006EA"
+          },
+          {
+            "cell": "D34",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E34",
+            "value": "日本語能力試験  N1"
+          },
+          {
+            "cell": "F34",
+            "value": "N1A328060J"
+          },
+          {
+            "cell": "G34",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A35",
+            "value": "31"
+          },
+          {
+            "cell": "B35",
+            "value": "焦 越(JIAO YUE)"
+          },
+          {
+            "cell": "C35",
+            "value": "UH84136681EA"
+          },
+          {
+            "cell": "D35",
+            "value": "進学"
+          },
+          {
+            "cell": "E35",
+            "value": "専門学校東京デザイナー・アカデミー"
+          },
+          {
+            "cell": "G35",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A36",
+            "value": "32"
+          },
+          {
+            "cell": "B36",
+            "value": "焦 越(JIAO YUE)"
+          },
+          {
+            "cell": "C36",
+            "value": "UH84136681EA"
+          },
+          {
+            "cell": "D36",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E36",
+            "value": "日本語能力試験  N2"
+          },
+          {
+            "cell": "F36",
+            "value": "N2A428162J"
+          },
+          {
+            "cell": "G36",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A37",
+            "value": "33"
+          },
+          {
+            "cell": "B37",
+            "value": "王 曦(WANG XI)"
+          },
+          {
+            "cell": "C37",
+            "value": "UH12166604EA"
+          },
+          {
+            "cell": "D37",
+            "value": "進学"
+          },
+          {
+            "cell": "E37",
+            "value": "アートマスターズスクール"
+          },
+          {
+            "cell": "G37",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A38",
+            "value": "34"
+          },
+          {
+            "cell": "B38",
+            "value": "王 梓涵(WANG ZIHAN)"
+          },
+          {
+            "cell": "C38",
+            "value": "UH44069172EA"
+          },
+          {
+            "cell": "D38",
+            "value": "進学"
+          },
+          {
+            "cell": "E38",
+            "value": "文化服装学院"
+          },
+          {
+            "cell": "G38",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A39",
+            "value": "35"
+          },
+          {
+            "cell": "B39",
+            "value": "白 展昊(BAI ZHANHAO)"
+          },
+          {
+            "cell": "C39",
+            "value": "UH33744140EF"
+          },
+          {
+            "cell": "D39",
+            "value": "進学"
+          },
+          {
+            "cell": "E39",
+            "value": "日本大学"
+          },
+          {
+            "cell": "G39",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A40",
+            "value": "36"
+          },
+          {
+            "cell": "B40",
+            "value": "白 展昊(BAI ZHANHAO)"
+          },
+          {
+            "cell": "C40",
+            "value": "UH33744140EF"
+          },
+          {
+            "cell": "D40",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E40",
+            "value": "日本語能力試験  N2"
+          },
+          {
+            "cell": "F40",
+            "value": "N2A429166J"
+          },
+          {
+            "cell": "G40",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A41",
+            "value": "37"
+          },
+          {
+            "cell": "B41",
+            "value": "袁 旭东(YUAN XUDONG)"
+          },
+          {
+            "cell": "C41",
+            "value": "UH77000395EA"
+          },
+          {
+            "cell": "D41",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E41",
+            "value": "日本語能力試験  N1"
+          },
+          {
+            "cell": "F41",
+            "value": "N1A319974J"
+          },
+          {
+            "cell": "G41",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A42",
+            "value": "38"
+          },
+          {
+            "cell": "B42",
+            "value": "袁 阳阳(YUAN YANGYANG)"
+          },
+          {
+            "cell": "C42",
+            "value": "UH77145729EA"
+          },
+          {
+            "cell": "D42",
+            "value": "進学"
+          },
+          {
+            "cell": "E42",
+            "value": "帝京平成大学"
+          },
+          {
+            "cell": "G42",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A43",
+            "value": "39"
+          },
+          {
+            "cell": "B43",
+            "value": "郑 思雨(ZHENG SIYU)"
+          },
+          {
+            "cell": "C43",
+            "value": "UH82866044EA"
+          },
+          {
+            "cell": "D43",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E43",
+            "value": "日本語能力試験  N1"
+          },
+          {
+            "cell": "F43",
+            "value": "N1A330314J"
+          },
+          {
+            "cell": "G43",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A44",
+            "value": "40"
+          },
+          {
+            "cell": "B44",
+            "value": "陈 蕾(CHEN LEI)"
+          },
+          {
+            "cell": "C44",
+            "value": "UH54778353EA"
+          },
+          {
+            "cell": "D44",
+            "value": "進学"
+          },
+          {
+            "cell": "E44",
+            "value": "帝京大学"
+          },
+          {
+            "cell": "G44",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A45",
+            "value": "41"
+          },
+          {
+            "cell": "B45",
+            "value": "陶 奕龙(TAO YILONG)"
+          },
+          {
+            "cell": "C45",
+            "value": "UH05789658EA"
+          },
+          {
+            "cell": "D45",
+            "value": "進学"
+          },
+          {
+            "cell": "E45",
+            "value": "日本大学"
+          },
+          {
+            "cell": "G45",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A46",
+            "value": "42"
+          },
+          {
+            "cell": "B46",
+            "value": "陶 奕龙(TAO YILONG)"
+          },
+          {
+            "cell": "C46",
+            "value": "UH05789658EA"
+          },
+          {
+            "cell": "D46",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E46",
+            "value": "日本語能力試験  N2"
+          },
+          {
+            "cell": "F46",
+            "value": "N2A407557J"
+          },
+          {
+            "cell": "G46",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A47",
+            "value": "43"
+          },
+          {
+            "cell": "B47",
+            "value": "马 成砺(MA CHENGLI)"
+          },
+          {
+            "cell": "C47",
+            "value": "UH95663486EA"
+          },
+          {
+            "cell": "D47",
+            "value": "進学"
+          },
+          {
+            "cell": "E47",
+            "value": "大妻女子大学"
+          },
+          {
+            "cell": "G47",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A48",
+            "value": "44"
+          },
+          {
+            "cell": "B48",
+            "value": "CLOIX JULIEN GUILLAUME"
+          },
+          {
+            "cell": "C48",
+            "value": "UH30993388EA"
+          },
+          {
+            "cell": "D48",
+            "value": "就職"
+          },
+          {
+            "cell": "E48",
+            "value": "野村證券株式会社"
+          },
+          {
+            "cell": "G48",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A49",
+            "value": "45"
+          },
+          {
+            "cell": "B49",
+            "value": "CLOIX JULIEN GUILLAUME"
+          },
+          {
+            "cell": "C49",
+            "value": "UH30993388EA"
+          },
+          {
+            "cell": "D49",
+            "value": "日本語教育の参照枠（試験）"
+          },
+          {
+            "cell": "E49",
+            "value": "日本語能力試験  N2"
+          },
+          {
+            "cell": "F49",
+            "value": "N2A480955J"
+          },
+          {
+            "cell": "G49",
+            "value": "2026/03/19"
+          },
+          {
+            "cell": "A50",
+            "value": "46"
+          },
+          {
+            "cell": "B50",
+            "value": "GRAHAM ARAN SETH"
+          },
+          {
+            "cell": "C50",
+            "value": "UH20837732EA"
+          },
+          {
+            "cell": "D50",
+            "value": "就職"
+          },
+          {
+            "cell": "E50",
+            "value": "Bottlecap KK"
+          },
+          {
+            "cell": "G50",
+            "value": "2026/03/10（退）"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "file": "/Users/setsuiken/Desktop/工作/学生管理系统/年度終了報告-模板/報告様式.xlsx",
+    "sheets": [
+      {
+        "title": "報告様式",
+        "max_row": 23,
+        "max_column": 12,
+        "merged_ranges": [
+          "A5:D5",
+          "E12:F12",
+          "A14:G14",
+          "A13:G13",
+          "A1:G1",
+          "A17:A19",
+          "A4:D4",
+          "A11:B11",
+          "A23:F23",
+          "A10:B10",
+          "A7:E7",
+          "A8:F8",
+          "A20:G20",
+          "B19:C19",
+          "A22:F22",
+          "B17:C17",
+          "B18:C18",
+          "A12:B12"
+        ],
+        "values": [
+          {
+            "cell": "A1",
+            "value": "課程修了者の日本語能力習得状況等"
+          },
+          {
+            "cell": "G3",
+            "value": "作成年月日：　　　2026年04月06日"
+          },
+          {
+            "cell": "A4",
+            "value": "日本語教育機関名：渋谷外語学院"
+          },
+          {
+            "cell": "A5",
+            "value": "設置者名：知日株式会社"
+          },
+          {
+            "cell": "A7",
+            "value": "課程修了者の日本語能力習得状況等"
+          },
+          {
+            "cell": "G7",
+            "value": "基準適合性"
+          },
+          {
+            "cell": "A8",
+            "value": "第４４号：大学等への進学者、入管法別表第１の１の表若しくは第１の２の表の上欄の在留資格（外交・公用及び技能実習を除く。）への変更を許可された者及び「日本語教育の参照枠」のＡ２相当以上と認められる者の合計が、課程修了の認定を受けた者の７割以上"
+          },
+          {
+            "cell": "G8",
+            "value": "〇"
+          },
+          {
+            "cell": "A10",
+            "value": "基準該当者割合 ②÷（①＋③）"
+          },
+          {
+            "cell": "C10",
+            "value": "76.8%"
+          },
+          {
+            "cell": "A11",
+            "value": "課程修了者数 （※１，※２） ①"
+          },
+          {
+            "cell": "C11",
+            "value": "203.0"
+          },
+          {
+            "cell": "A12",
+            "value": "基準該当者合計数 （実人数） ②"
+          },
+          {
+            "cell": "C12",
+            "value": "163.0"
+          },
+          {
+            "cell": "E12",
+            "value": "左記「基準該当者合計数（実人数）」のうち退学者数（４４号ただし書き） ③"
+          },
+          {
+            "cell": "G12",
+            "value": "9.0"
+          },
+          {
+            "cell": "A13",
+            "value": "※１　退学者は含めない。"
+          },
+          {
+            "cell": "A14",
+            "value": "※２　各年度の課程修了の認定を受けた者が，その修了日までに入管法別表第１の１の表若しくは第１の２の表の上欄の在留資格（外交，公用及び技能実習を除く。）への在留資格変更許可申請をした場合において，当該申請に対する処分が，この号に基づく地方出入国在留管理局への報告までになされないときは，当該者を分母となる課程修了認定者の数に該当する者として加える必要はない。"
+          },
+          {
+            "cell": "A16",
+            "value": "基準該当者の各内訳"
+          },
+          {
+            "cell": "D16",
+            "value": "総合2年コース"
+          },
+          {
+            "cell": "E16",
+            "value": "総合1年コース"
+          },
+          {
+            "cell": "A17",
+            "value": "※該当する要件が二以上ある生徒は，ａ～ｃのそれぞれに計上可。ただし，「基準該当者合計数（上記②）」は実人数を算出する必要があるため，当該生徒について重複を除き，一人として扱うこと。"
+          },
+          {
+            "cell": "B17",
+            "value": "ａ．大学等への進学者の数\n※我が国での進学に限り，非正規生は除く。"
+          },
+          {
+            "cell": "D17",
+            "value": "61"
+          },
+          {
+            "cell": "E17",
+            "value": "69"
+          },
+          {
+            "cell": "B18",
+            "value": "ｂ．入管法別表第一の一の表若しくは二の表の上欄の在留資格（外交，公用及び技能実習を除く。）への変更を許可された者の数"
+          },
+          {
+            "cell": "D18",
+            "value": "15"
+          },
+          {
+            "cell": "E18",
+            "value": "2"
+          },
+          {
+            "cell": "B19",
+            "value": "ｃ．「日本語教育の参照枠」のＡ２相当以上のレベルであることが試験その他の評価方法により証明されている者の数\n※法務省ＨＰに掲載された試験又は日本留学試験に限る。"
+          },
+          {
+            "cell": "D19",
+            "value": "44"
+          },
+          {
+            "cell": "E19",
+            "value": "27"
+          },
+          {
+            "cell": "A20",
+            "value": "※「日本語教育の参照枠」のＡ２相当以上のレベルであることが試験その他の評価方法により証明されている者（Ｃ）については、「日本語教育の参照枠」のＡ２相当以上のレベルであることを証明するための書類（試験の合格証等）の写しを本報告書と併せて提出すること。"
+          },
+          {
+            "cell": "A22",
+            "value": "基準該当者合計数（②）及び内訳（ａ～ｃのそれぞれの合計）の公表の方法"
+          }
+        ]
+      }
+    ]
+  }
+]

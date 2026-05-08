@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>出願フォーム | SchoolCore</title>
+  <link rel="stylesheet" href="/static/apply.css">
+</head>
+<body>
+  <main class="portal-shell">
+    <section class="portal-hero">
+      <div class="hero-copy">
+        <div class="hero-kicker">入学申請フォーム</div>
+        <h1>面接申請情報を入力してください</h1>
+        <p>入力後、事務局が内容を確認し、以後の案内をメールでお送りします。</p>
+      </div>
+      <div class="hero-meta">
+        <div class="meta-card">
+          <strong>入力目安</strong>
+          <span>7 - 10 分</span>
+        </div>
+        <div class="meta-card">
+          <strong>必須区分</strong>
+          <span>5 項目</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="portal-form-wrap">
+      <form id="portalForm" class="portal-form">
+        <div class="section-title">1. 入学時期・在学予定</div>
+        <div class="form-grid">
+          <label>
+            入学期
+            <select name="admission_term" required>
+              <option value="">選択してください</option>
+              <option>2026年7月期</option>
+              <option>2026年10月期</option>
+              <option>2027年1月期</option>
+              <option>2027年4月期</option>
+              <option>短期随時</option>
+            </select>
+          </label>
+          <label>
+            語学学校滞在予定期間
+            <select name="desired_study_length" required>
+              <option value="">選択してください</option>
+              <option>6か月</option>
+              <option>1年</option>
+              <option>1年6か月</option>
+              <option>2年</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="section-title">2. 個人情報</div>
+        <div class="form-grid">
+          <label>
+            氏名（パスポート表記）
+            <input name="name" required>
+          </label>
+          <label>
+            国籍・地域
+            <input name="nationality" required>
+          </label>
+          <label>
+            メールアドレス
+            <input type="email" name="email" required>
+          </label>
+          <label>
+            電話番号
+            <input name="phone" required>
+          </label>
+          <label>
+            生年月日
+            <input type="date" name="birth_date">
+          </label>
+          <label>
+            パスポート番号
+            <input name="passport_no">
+          </label>
+          <label class="full">
+            現住所
+            <input name="address">
+          </label>
+        </div>
+
+        <div class="section-title">3. 学歴</div>
+        <div class="form-grid">
+          <label>
+            最終学歴
+            <input name="highest_education">
+          </label>
+          <label>
+            学校名
+            <input name="school_name">
+          </label>
+          <label>
+            卒業年
+            <input name="graduation_year">
+          </label>
+          <label class="full">
+            学歴備考
+            <textarea name="education_notes" rows="3"></textarea>
+          </label>
+        </div>
+
+        <div class="section-title">4. 申請歴</div>
+        <div class="form-grid">
+          <label>
+            日本留学・申請歴
+            <textarea name="previous_application" rows="3"></textarea>
+          </label>
+          <label>
+            日本語学習歴
+            <textarea name="japanese_study_history" rows="3"></textarea>
+          </label>
+          <label class="full">
+            申請備考
+            <textarea name="application_notes" rows="3"></textarea>
+          </label>
+        </div>
+
+        <div class="section-title">5. 経費支弁者情報</div>
+        <div class="form-grid">
+          <label>
+            経費支弁者氏名
+            <input name="sponsor_name">
+          </label>
+          <label>
+            続柄
+            <input name="sponsor_relationship">
+          </label>
+          <label>
+            電話番号
+            <input name="sponsor_phone">
+          </label>
+          <label>
+            年収
+            <input name="sponsor_income">
+          </label>
+          <label class="full">
+            備考
+            <textarea name="financial_notes" rows="3"></textarea>
+          </label>
+          <label class="full">
+            エージェント名（ある場合）
+            <input name="agent_name">
+          </label>
+        </div>
+
+        <div class="submit-row">
+          <button class="submit-btn" type="submit">送信する</button>
+        </div>
+      </form>
+
+      <section id="successBox" class="success-box hidden"></section>
+    </section>
+  </main>
+  <script src="/static/apply.js"></script>
+</body>
+</html>

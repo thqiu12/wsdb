@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学生マイページ | SchoolCore</title>
+  <link rel="stylesheet" href="/static/student.css">
+</head>
+<body>
+  <main class="student-portal">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="hero-kicker">学生ポータル</div>
+        <h1>学生マイページ</h1>
+        <p>学生番号とパスワードでログインすると、在籍情報の確認と証明書申請ができます。</p>
+      </div>
+      <div class="hero-meta">
+        <div class="meta-card">
+          <strong>確認できる内容</strong>
+          <span>在籍・在留・連絡先</span>
+        </div>
+        <div class="meta-card">
+          <strong>証明書申請</strong>
+          <span>出席率・成績・修了</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="auth-tabs">
+        <button class="auth-tab active" type="button" data-auth-mode="login">ログイン</button>
+        <button class="auth-tab" type="button" data-auth-mode="setup">初回パスワード設定</button>
+      </div>
+
+      <form id="studentLoginForm" class="lookup-form">
+        <label>
+          学生番号
+          <input name="login_id" placeholder="例: 202604125" required>
+        </label>
+        <label>
+          パスワード
+          <input type="password" name="password" placeholder="パスワード" required>
+        </label>
+        <button class="primary-btn" type="submit">ログインする</button>
+      </form>
+
+      <form id="studentSetupForm" class="lookup-form hidden">
+        <label>
+          学生番号
+          <input name="student_no" placeholder="例: 202604125" required>
+        </label>
+        <label>
+          生年月日
+          <input type="date" name="birth_date" required>
+        </label>
+        <label>
+          新しいパスワード
+          <input type="password" name="password" placeholder="8文字以上" required>
+        </label>
+        <label>
+          パスワード確認
+          <input type="password" name="password_confirm" placeholder="もう一度入力" required>
+        </label>
+        <button class="primary-btn" type="submit">設定してログイン</button>
+      </form>
+    </section>
+
+    <section id="studentPortalContent" class="content hidden"></section>
+  </main>
+  <script src="/static/student.js"></script>
+</body>
+</html>

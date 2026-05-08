@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SchoolCore MVP</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <div>
+          <div class="brand-title">SchoolCore</div>
+          <div class="brand-subtitle">学籍・在留・帳票管理</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <div class="nav-section-label">Overview</div>
+        <button class="active" data-view="dashboard">Dashboard</button>
+        <div class="nav-section-label">Admissions</div>
+        <button data-view="intake">受付</button>
+        <button data-view="applicants">出願者</button>
+        <button data-view="coe">COE進行</button>
+        <button data-view="payments">入金・領収書</button>
+        <div class="nav-section-label">Student Life</div>
+        <button data-view="students">学生</button>
+        <button data-view="studentPortal">学生連携</button>
+        <button data-view="certificates">証明書</button>
+        <div class="nav-section-label">Reporting</div>
+        <button data-view="immigration">入管報告</button>
+        <button data-view="annualResults">年度結果</button>
+        <button data-view="documents">帳票台帳</button>
+        <button data-view="audit">監査ログ</button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="title">Dashboard</h1>
+          <p id="subtitle">実データを API から読み込むローカル MVP</p>
+        </div>
+        <div class="user-pill">事務局 山田 / staff</div>
+      </header>
+
+      <section id="dashboard" class="view"></section>
+      <section id="intake" class="view hidden"></section>
+      <section id="applicants" class="view hidden"></section>
+      <section id="coe" class="view hidden"></section>
+      <section id="payments" class="view hidden"></section>
+      <section id="students" class="view hidden"></section>
+      <section id="studentPortal" class="view hidden"></section>
+      <section id="certificates" class="view hidden"></section>
+      <section id="immigration" class="view hidden"></section>
+      <section id="annualResults" class="view hidden"></section>
+      <section id="documents" class="view hidden"></section>
+      <section id="audit" class="view hidden"></section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <div id="modalRoot" class="modal-backdrop hidden"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,2642 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SchoolCore Demo</title>
+  <style>
+    :root {
+      --ink: #202124;
+      --muted: #667085;
+      --line: #e2e8f0;
+      --soft: #f8fafc;
+      --white: #ffffff;
+      --green: #0f766e;
+      --green-dark: #115e59;
+      --red: #b42318;
+      --yellow: #b7791f;
+      --cyan: #0e7490;
+      --blue: #2563eb;
+      --shadow: 0 18px 44px rgba(15, 23, 42, .10);
+      --radius: 8px;
+      font-family: Inter, "Hiragino Sans", "Yu Gothic", "Noto Sans JP", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, #eef7f6 0, #f6f8fb 280px, #f6f8fb 100%);
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 268px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: rgba(255, 255, 255, .92);
+      color: #0f172a;
+      padding: 20px 16px;
+      position: sticky;
+      top: 0;
+      min-height: 100vh;
+      border-right: 1px solid var(--line);
+      box-shadow: 10px 0 30px rgba(15, 23, 42, .04);
+    }
+
+    .brand {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 10px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background-image: url("https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=160&q=80");
+      background-size: cover;
+      background-position: center;
+      border: 2px solid #ffffff;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, .12);
+    }
+
+    .brand-title {
+      font-weight: 800;
+      font-size: 18px;
+      line-height: 1.1;
+      color: #0f172a;
+    }
+
+    .brand-subtitle {
+      color: #64748b;
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .nav {
+      display: grid;
+      gap: 6px;
+    }
+
+    .nav button {
+      width: 100%;
+      border: 0;
+      border-radius: 8px;
+      color: #475569;
+      background: transparent;
+      text-align: left;
+      padding: 11px 12px;
+      cursor: pointer;
+      font-weight: 750;
+    }
+
+    .nav button.active,
+    .nav button:hover {
+      background: #e7f5f2;
+      color: var(--green-dark);
+      box-shadow: inset 3px 0 0 var(--green-dark);
+    }
+
+    .main {
+      min-width: 0;
+      padding: 24px 28px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin: -4px -6px 20px;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, .78);
+      border: 1px solid rgba(226, 232, 240, .88);
+      border-radius: 8px;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, .06);
+      backdrop-filter: blur(10px);
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      color: #0f172a;
+    }
+
+    .page-subtitle {
+      color: var(--muted);
+      margin-top: 5px;
+      font-size: 14px;
+    }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(20, 31, 54, .06);
+      white-space: nowrap;
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background-image: url("https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80");
+      background-size: cover;
+      background-position: center;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid.stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .grid.two {
+      grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr);
+      align-items: start;
+    }
+
+    .grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, .06);
+      min-width: 0;
+    }
+
+    .stat {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: var(--green-dark);
+    }
+
+    .stats .card:nth-child(2)::before {
+      background: var(--red);
+    }
+
+    .stats .card:nth-child(3)::before {
+      background: #d97706;
+    }
+
+    .stats .card:nth-child(4)::before {
+      background: var(--cyan);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff, #fbfdff);
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 800;
+      margin: 0;
+    }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    .stat {
+      padding: 16px;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 9px;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 850;
+      line-height: 1;
+    }
+
+    .stat-note {
+      color: var(--muted);
+      margin-top: 8px;
+      font-size: 12px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .search,
+    select {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--white);
+      height: 40px;
+      padding: 0 12px;
+      min-width: 180px;
+    }
+
+    .search {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .btn {
+      height: 40px;
+      border: 1px solid var(--line);
+      background: var(--white);
+      border-radius: 8px;
+      padding: 0 14px;
+      cursor: pointer;
+      font-weight: 700;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, .05);
+    }
+
+    .btn.primary {
+      background: var(--green-dark);
+      border-color: var(--green-dark);
+      color: white;
+    }
+
+    .btn.warn {
+      background: #fff7ed;
+      border-color: #fed7aa;
+      color: #9a3412;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--white);
+      min-height: 40px;
+      padding: 9px 10px;
+    }
+
+    .field textarea {
+      min-height: 82px;
+      resize: vertical;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 800;
+      background: #f8fafc;
+    }
+
+    tr.clickable {
+      cursor: pointer;
+    }
+
+    tr.clickable:hover {
+      background: #eefbf8;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      border-radius: 8px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 800;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .badge.green {
+      color: #0f766e;
+      background: #ccfbf1;
+      border-color: #99f6e4;
+    }
+
+    .badge.red {
+      color: var(--red);
+      background: #fee4e2;
+      border-color: #fecdca;
+    }
+
+    .badge.yellow {
+      color: #92400e;
+      background: #fef3c7;
+      border-color: #fde68a;
+    }
+
+    .badge.blue {
+      color: #075985;
+      background: #e0f2fe;
+      border-color: #bae6fd;
+    }
+
+    .badge.gray {
+      color: #475467;
+      background: #f2f4f7;
+      border-color: #e4e7ec;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--line);
+      padding: 12px 16px 0;
+    }
+
+    .tabs button {
+      border: 0;
+      background: transparent;
+      padding: 10px 12px;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .tabs button.active {
+      background: #e7f5f2;
+      color: var(--green);
+    }
+
+    .profile-head {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 18px;
+    }
+
+    .student-photo {
+      width: 92px;
+      height: 92px;
+      border-radius: 8px;
+      background-image: url("https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=220&q=80");
+      background-size: cover;
+      background-position: center;
+      border: 1px solid var(--line);
+    }
+
+    .profile-name {
+      font-size: 23px;
+      font-weight: 850;
+      margin: 0 0 6px;
+    }
+
+    .profile-meta {
+      color: var(--muted);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 13px;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .info {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 72px;
+    }
+
+    .info-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .info-value {
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .timeline-date {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .report-flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .flow-step {
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 88px;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, .04);
+    }
+
+    .flow-step.done {
+      border-color: #99f6e4;
+      background: #ecfdf5;
+    }
+
+    .flow-step.current {
+      border-color: #facc15;
+      background: #fefce8;
+      box-shadow: 0 12px 28px rgba(180, 83, 9, .12);
+    }
+
+    .flow-title {
+      font-weight: 850;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .flow-note {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 24px;
+      background: #f8fafc;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+    }
+
+    .step-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .step-row {
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .step-no {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-weight: 850;
+      color: #ffffff;
+      background: var(--green);
+    }
+
+    .preview-paper {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      min-height: 320px;
+      box-shadow: var(--shadow);
+    }
+
+    .paper-title {
+      text-align: center;
+      font-size: 20px;
+      font-weight: 850;
+      margin: 12px 0 24px;
+    }
+
+    .paper-lines {
+      display: grid;
+      gap: 12px;
+      font-size: 14px;
+    }
+
+    .portal-shell {
+      background: #f7fbfb;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .portal-hero {
+      min-height: 220px;
+      color: #ffffff;
+      padding: 26px;
+      display: grid;
+      align-content: end;
+      background:
+        linear-gradient(90deg, rgba(8, 47, 51, .88), rgba(8, 47, 51, .38)),
+        url("https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1400&q=80");
+      background-size: cover;
+      background-position: center;
+    }
+
+    .portal-hero h2 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.18;
+    }
+
+    .portal-hero p {
+      margin: 0;
+      max-width: 680px;
+      color: #e6f4f2;
+    }
+
+    .portal-content {
+      padding: 18px;
+    }
+
+    .phone-preview {
+      width: min(390px, 100%);
+      margin: 0 auto;
+      border: 10px solid #0f172a;
+      border-radius: 28px;
+      background: #ffffff;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .phone-top {
+      height: 34px;
+      background: #0f172a;
+      color: #dbeafe;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .phone-content {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .mobile-action {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      background: #14313a;
+      color: #fff;
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+      z-index: 30;
+      max-width: 360px;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, .48);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      z-index: 20;
+    }
+
+    .modal {
+      width: min(860px, 100%);
+      max-height: min(760px, calc(100vh - 40px));
+      overflow: auto;
+      background: var(--white);
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .modal.small {
+      width: min(620px, 100%);
+    }
+
+    .modal-header,
+    .modal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-footer {
+      border-top: 1px solid var(--line);
+      border-bottom: 0;
+      justify-content: flex-end;
+    }
+
+    .modal-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 850;
+    }
+
+    .close {
+      border: 1px solid var(--line);
+      background: var(--white);
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      font-weight: 850;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        min-height: auto;
+      }
+
+      .nav {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid.stats,
+      .grid.two,
+      .grid.three,
+      .info-grid,
+      .report-flow,
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar,
+      .profile-head {
+        align-items: stretch;
+        grid-template-columns: 1fr;
+        flex-direction: column;
+      }
+
+      .user-pill {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <div class="brand-title">SchoolCore</div>
+          <div class="brand-subtitle">留学生業務プラットフォーム</div>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Main">
+        <button class="active" data-view="dashboard">Dashboard</button>
+        <button data-view="admission">Web出願</button>
+        <button data-view="studentPortal">出願者ポータル</button>
+        <button data-view="enrolledStudentPortal">在籍生ポータル</button>
+        <button data-view="coeWorkflow">COE進行</button>
+        <button data-view="students">学生管理</button>
+        <button data-view="attendance">出席管理</button>
+        <button data-view="visa">在留管理</button>
+        <button data-view="reports">入管報告</button>
+        <button data-view="certificates">証明書</button>
+        <button data-view="templates">テンプレート</button>
+        <button data-view="migration">データ移行</button>
+        <button data-view="settings">設定</button>
+        <button data-view="roadmap">開発計画</button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h1 class="page-title" id="pageTitle">Dashboard</h1>
+          <div class="page-subtitle" id="pageSubtitle">本日の確認事項と提出期限</div>
+        </div>
+        <div class="user-pill">
+          <div class="avatar" aria-hidden="true"></div>
+          <div>
+            <strong>事務局 山田</strong>
+            <div class="page-subtitle">Office Staff</div>
+          </div>
+        </div>
+      </div>
+
+      <section id="dashboard" class="view">
+        <div class="grid stats">
+          <div class="card stat">
+            <div class="stat-label">在籍生</div>
+            <div class="stat-value">428</div>
+            <div class="stat-note">留学生 392 / 国内 36</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">在留期限 30日以内</div>
+            <div class="stat-value" style="color: var(--red)">18</div>
+            <div class="stat-note">未着手 5 件</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">出席率 50% 未満</div>
+            <div class="stat-value" style="color: var(--yellow)">7</div>
+            <div class="stat-note">4月分 報告候補</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">未完了報告</div>
+            <div class="stat-value" style="color: var(--cyan)">12</div>
+            <div class="stat-note">期限超過 2 件</div>
+          </div>
+        </div>
+
+        <div class="grid two" style="margin-top: 14px;">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">優先対応リスト</h2>
+              <button class="btn primary" data-view-target="reports">報告を作成</button>
+            </div>
+            <div class="card-body">
+              <table>
+                <thead>
+                  <tr>
+                    <th>区分</th>
+                    <th>対象</th>
+                    <th>期限</th>
+                    <th>状態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>在留更新</td>
+                    <td>グエン ミン アン</td>
+                    <td>2026-05-08</td>
+                    <td><span class="badge red">未着手</span></td>
+                  </tr>
+                  <tr>
+                    <td>出席率不良</td>
+                    <td>2026年4月 7名</td>
+                    <td>2026-05-31</td>
+                    <td><span class="badge yellow">確認待ち</span></td>
+                  </tr>
+                  <tr>
+                    <td>退学報告</td>
+                    <td>チャン ティ ラン</td>
+                    <td>2026-04-30</td>
+                    <td><span class="badge red">期限間近</span></td>
+                  </tr>
+              <tr>
+                <td>半年度報告</td>
+                <td>2025年10月-2026年3月</td>
+                <td>2026-06-30</td>
+                <td><span class="badge blue">作成中</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">最近の操作</h2>
+            </div>
+            <div class="card-body timeline">
+              <div class="timeline-item">
+                <div class="timeline-date">09:42</div>
+                <div>出席率証明書を発行しました<br><span class="page-subtitle">王 小雨 / 発行者: 山田</span></div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-date">09:20</div>
+                <div>在留カード画像を更新しました<br><span class="page-subtitle">グエン ミン アン</span></div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-date">08:55</div>
+                <div>4月出席率を再計算しました<br><span class="page-subtitle">国際ビジネス科 1A</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="admission" class="view hidden">
+        <div class="grid stats">
+          <div class="card stat">
+            <div class="stat-label">出願提出済</div>
+            <div class="stat-value">86</div>
+            <div class="stat-note">今月 +23 件</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">書類不足</div>
+            <div class="stat-value" style="color: var(--yellow)">14</div>
+            <div class="stat-note">在留カード未提出 6 件</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">合格者</div>
+            <div class="stat-value" style="color: var(--green)">38</div>
+            <div class="stat-note">手続完了 21 件</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">学籍化待ち</div>
+            <div class="stat-value" style="color: var(--cyan)">17</div>
+            <div class="stat-note">学生番号発行前</div>
+          </div>
+        </div>
+
+        <div class="grid two" style="margin-top: 14px;">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">出願から学籍化まで</h2>
+              <button class="btn primary" data-open-modal="application">出願フォームを見る</button>
+            </div>
+            <div class="card-body step-list">
+              <div class="step-row">
+                <div class="step-no">1</div>
+                <div>
+                  <strong>Web出願</strong>
+                  <div class="page-subtitle">志望学科、基本情報、在留情報、必要書類をオンライン提出</div>
+                </div>
+                <span class="badge green">受付中</span>
+              </div>
+              <div class="step-row">
+                <div class="step-no">2</div>
+                <div>
+                  <strong>書類審査</strong>
+                  <div class="page-subtitle">不足資料と入力不備を自動チェック</div>
+                </div>
+                <span class="badge yellow">14件</span>
+              </div>
+              <div class="step-row">
+                <div class="step-no">3</div>
+                <div>
+                  <strong>選考・合否</strong>
+                  <div class="page-subtitle">面接、作文、合格通知書の発行</div>
+                </div>
+                <span class="badge blue">38名合格</span>
+              </div>
+              <div class="step-row">
+                <div class="step-no">4</div>
+                <div>
+                  <strong>入学手続</strong>
+                  <div class="page-subtitle">誓約、保証人、振込控え、追加書類を回収</div>
+                </div>
+                <span class="badge blue">進行中</span>
+              </div>
+              <div class="step-row">
+                <div class="step-no">5</div>
+                <div>
+                  <strong>学籍化</strong>
+                  <div class="page-subtitle">出願情報から学生台帳、在留管理、証明書データへ継承</div>
+                </div>
+                <span class="badge gray">待機</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">出願者ピックアップ</h2>
+              <button class="btn">CSV取込</button>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>出願番号</th>
+                    <th>氏名</th>
+                    <th>志望</th>
+                    <th>状態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>A26-0108</td>
+                    <td>LE THI MAI</td>
+                    <td>国際ビジネス科</td>
+                    <td><span class="badge yellow">書類不足</span></td>
+                  </tr>
+                  <tr>
+                    <td>A26-0114</td>
+                    <td>ZHANG YUE</td>
+                    <td>ITビジネス科</td>
+                    <td><span class="badge green">合格</span></td>
+                  </tr>
+                  <tr>
+                    <td>A26-0121</td>
+                    <td>RAI SUSHIL</td>
+                    <td>日本語課程</td>
+                    <td><span class="badge blue">手続中</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="studentPortal" class="view hidden">
+        <div class="portal-shell">
+          <div class="portal-hero">
+            <h2>渋谷外語学院 入学手続ポータル</h2>
+            <p>出願内容、必要書類、COE申請、学費納入、来日準備まで、現在の手続状況を確認できます。</p>
+          </div>
+          <div class="portal-content">
+            <div class="grid stats">
+              <div class="card stat">
+                <div class="stat-label">現在のステップ</div>
+                <div class="stat-value" style="font-size: 22px;">COE準備</div>
+                <div class="stat-note">願書と必要書類を確認中です</div>
+              </div>
+              <div class="card stat">
+                <div class="stat-label">未提出書類</div>
+                <div class="stat-value" style="color: var(--yellow)">3</div>
+                <div class="stat-note">経費支弁者資料など</div>
+              </div>
+              <div class="card stat">
+                <div class="stat-label">次の期限</div>
+                <div class="stat-value" style="font-size: 22px;">4/28</div>
+                <div class="stat-note">不足書類アップロード</div>
+              </div>
+              <div class="card stat">
+                <div class="stat-label">学校からのお知らせ</div>
+                <div class="stat-value" style="font-size: 22px;">2</div>
+                <div class="stat-note">内容を確認してください</div>
+              </div>
+            </div>
+
+            <div class="grid two" style="margin-top: 14px;">
+              <div class="card">
+                <div class="card-header">
+                  <h2 class="card-title">手続の進行状況</h2>
+                  <span class="badge blue">2026年10月入学</span>
+                </div>
+                <div class="card-body step-list">
+                  <div class="step-row">
+                    <div class="step-no">1</div>
+                    <div><strong>出願受付</strong><div class="page-subtitle">出願情報を受け付けました</div></div>
+                    <span class="badge green">完了</span>
+                  </div>
+                  <div class="step-row">
+                    <div class="step-no">2</div>
+                    <div><strong>面接・合格通知</strong><div class="page-subtitle">合格通知書を発行しました</div></div>
+                    <span class="badge green">完了</span>
+                  </div>
+                  <div class="step-row">
+                    <div class="step-no">3</div>
+                    <div><strong>COE申請準備</strong><div class="page-subtitle">提出書類を確認しています</div></div>
+                    <span class="badge yellow">進行中</span>
+                  </div>
+                  <div class="step-row">
+                    <div class="step-no">4</div>
+                    <div><strong>COE交付・学費納入</strong><div class="page-subtitle">COE交付後に学費案内を送付します</div></div>
+                    <span class="badge gray">未開始</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <h2 class="card-title">必要書類</h2>
+                  <button class="btn primary" data-open-modal="application">アップロード</button>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                  <table>
+                    <thead>
+                      <tr><th>書類</th><th>状態</th><th>メモ</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>パスポート</td><td><span class="badge green">提出済</span></td><td>確認済</td></tr>
+                      <tr><td>卒業証明書</td><td><span class="badge green">提出済</span></td><td>翻訳確認中</td></tr>
+                      <tr><td>経費支弁者収入証明</td><td><span class="badge red">未提出</span></td><td>追加提出してください</td></tr>
+                      <tr><td>銀行残高証明</td><td><span class="badge yellow">差替</span></td><td>発行日が古いです</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="margin-top: 14px;">
+              <div class="card-header">
+                <h2 class="card-title">スマホ表示プレビュー</h2>
+                <span class="badge blue">Mobile First</span>
+              </div>
+              <div class="card-body">
+                <div class="phone-preview">
+                  <div class="phone-top">SchoolCore Student</div>
+                  <div class="phone-content">
+                    <div>
+                      <strong>王 小雨さん</strong>
+                      <div class="page-subtitle">国際ビジネス科 1A / 在籍中</div>
+                    </div>
+                    <div class="mobile-action">
+                      <div>
+                        <strong>今月の出席率</strong>
+                        <div class="page-subtitle">2026年4月</div>
+                      </div>
+                      <span class="badge green">92.1%</span>
+                    </div>
+                    <div class="mobile-action">
+                      <div>
+                        <strong>証明書申請</strong>
+                        <div class="page-subtitle">在学・出席率・成績</div>
+                      </div>
+                      <button class="btn primary">申請</button>
+                    </div>
+                    <div class="mobile-action">
+                      <div>
+                        <strong>住所・電話番号</strong>
+                        <div class="page-subtitle">変更がある場合は更新</div>
+                      </div>
+                      <button class="btn">更新</button>
+                    </div>
+                    <div class="mobile-action">
+                      <div>
+                        <strong>学校からのお知らせ</strong>
+                        <div class="page-subtitle">未読 3 件</div>
+                      </div>
+                      <span class="badge blue">確認</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="enrolledStudentPortal" class="view hidden">
+        <div class="portal-shell">
+          <div class="portal-hero">
+            <h2>在籍生マイページ</h2>
+            <p>出席状況、授業予定、証明書申請、在留更新、学校からのお知らせを確認できます。</p>
+          </div>
+          <div class="portal-content">
+            <div class="grid stats">
+              <div class="card stat">
+                <div class="stat-label">今月の出席率</div>
+                <div class="stat-value" style="color: var(--green-dark)">92.1%</div>
+                <div class="stat-note">2026年4月</div>
+              </div>
+              <div class="card stat">
+                <div class="stat-label">在留期限</div>
+                <div class="stat-value" style="font-size: 22px;">2027/03/15</div>
+                <div class="stat-note">更新対象外</div>
+              </div>
+              <div class="card stat">
+                <div class="stat-label">未読のお知らせ</div>
+                <div class="stat-value" style="color: var(--cyan)">3</div>
+                <div class="stat-note">学校事務局より</div>
+              </div>
+              <div class="card stat">
+                <div class="stat-label">申請中の証明書</div>
+                <div class="stat-value" style="font-size: 22px;">1件</div>
+                <div class="stat-note">出席率証明書</div>
+              </div>
+            </div>
+
+            <div class="grid two" style="margin-top: 14px;">
+              <div class="card">
+                <div class="card-header">
+                  <h2 class="card-title">今週の予定</h2>
+                  <span class="badge green">国際ビジネス科 1A</span>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                  <table>
+                    <thead>
+                      <tr><th>日付</th><th>時間</th><th>内容</th><th>場所</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>4/20(月)</td><td>09:00-12:30</td><td>日本語総合</td><td>301教室</td></tr>
+                      <tr><td>4/21(火)</td><td>09:00-12:30</td><td>会話・聴解</td><td>302教室</td></tr>
+                      <tr><td>4/22(水)</td><td>09:00-12:30</td><td>進学指導</td><td>301教室</td></tr>
+                      <tr><td>4/24(金)</td><td>13:30-14:00</td><td>在留更新説明会</td><td>オンライン</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <h2 class="card-title">できること</h2>
+                </div>
+                <div class="card-body step-list">
+                  <div class="step-row">
+                    <div class="step-no">1</div>
+                    <div><strong>証明書を申請</strong><div class="page-subtitle">staff 承認後にダウンロードできます</div></div>
+                    <button class="btn primary" data-open-modal="certificate">申請</button>
+                  </div>
+                  <div class="step-row">
+                    <div class="step-no">2</div>
+                    <div><strong>在留更新書類を確認</strong><div class="page-subtitle">学校から案内された必要書類を確認</div></div>
+                    <button class="btn">確認</button>
+                  </div>
+                  <div class="step-row">
+                    <div class="step-no">3</div>
+                    <div><strong>住所・電話番号を更新</strong><div class="page-subtitle">引越しや電話番号変更を学校へ連絡</div></div>
+                    <button class="btn">更新</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid two" style="margin-top: 14px;">
+              <div class="card">
+                <div class="card-header">
+                  <h2 class="card-title">出席状況</h2>
+                  <span class="badge green">良好</span>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                  <table>
+                    <thead>
+                      <tr><th>月</th><th>要出席</th><th>出席</th><th>出席率</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>2026年4月</td><td>5,400分</td><td>4,973分</td><td><span class="badge green">92.1%</span></td></tr>
+                      <tr><td>2026年3月</td><td>5,160分</td><td>4,742分</td><td><span class="badge green">91.9%</span></td></tr>
+                      <tr><td>2026年2月</td><td>4,920分</td><td>4,280分</td><td><span class="badge yellow">87.0%</span></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <h2 class="card-title">学校からのお知らせ</h2>
+                </div>
+                <div class="card-body timeline">
+                  <div class="timeline-item">
+                    <div class="timeline-date">4/20</div>
+                    <div>在留更新説明会のお知らせ<br><span class="page-subtitle">4/24(金) 13:30 オンライン</span></div>
+                  </div>
+                  <div class="timeline-item">
+                    <div class="timeline-date">4/18</div>
+                    <div>定期試験日程を公開しました<br><span class="page-subtitle">学生ポータルから確認できます</span></div>
+                  </div>
+                  <div class="timeline-item">
+                    <div class="timeline-date">4/15</div>
+                    <div>住所変更がある場合は事務局へ連絡してください</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="coeWorkflow" class="view hidden">
+        <div class="grid stats">
+          <div class="card stat">
+            <div class="stat-label">面接申請</div>
+            <div class="stat-value">42</div>
+            <div class="stat-note">選考料確認待ち 8 件</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">COE準備中</div>
+            <div class="stat-value" style="color: var(--cyan)">31</div>
+            <div class="stat-note">願書補完待ち 11 件</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">入管提出済</div>
+            <div class="stat-value" style="color: var(--green)">76</div>
+            <div class="stat-note">審査中 68 件</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">来日前準備</div>
+            <div class="stat-value" style="color: var(--yellow)">19</div>
+            <div class="stat-note">口語テスト未実施 12 件</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 14px;">
+          <div class="card-header">
+            <h2 class="card-title">語学学校 COE / 入学前ワークフロー</h2>
+            <div class="toolbar" style="margin: 0;">
+              <button class="btn warn" data-open-modal="aiCoeCheck">AI COEチェック</button>
+              <button class="btn" data-open-modal="receipt">領収書を発行</button>
+              <button class="btn primary" data-open-modal="report">入管提出ファイル生成</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="report-flow">
+              <div class="flow-step done">
+                <div class="flow-title">面接申請</div>
+                <div class="flow-note">個人台帳を作成</div>
+              </div>
+              <div class="flow-step done">
+                <div class="flow-title">選考料</div>
+                <div class="flow-note">20,000円・領収書発行</div>
+              </div>
+              <div class="flow-step done">
+                <div class="flow-title">面接</div>
+                <div class="flow-note">合格 / 保留 / 再面接 / 不合格</div>
+              </div>
+              <div class="flow-step done">
+                <div class="flow-title">合格通知</div>
+                <div class="flow-note">自動生成</div>
+              </div>
+              <div class="flow-step current">
+                <div class="flow-title">COE準備</div>
+                <div class="flow-note">願書情報を補完</div>
+              </div>
+            </div>
+            <div class="report-flow" style="margin-top: 10px;">
+              <div class="flow-step">
+                <div class="flow-title">入管提出</div>
+                <div class="flow-note">一括期限 / 個別期限</div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-title">COE交付</div>
+                <div class="flow-note">学費前は一部画像のみ送付</div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-title">学費納入</div>
+                <div class="flow-note">領収書 + COE全体（代理店送付可）</div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-title">来日予定</div>
+                <div class="flow-note">査証 / 航空券 / 住所</div>
+              </div>
+              <div class="flow-step">
+                <div class="flow-title">クラス分け・入学</div>
+                <div class="flow-note">口頭テスト</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 14px;">
+          <div class="card-header">
+            <h2 class="card-title">進行中の学生</h2>
+            <button class="btn" data-open-modal="application">面接申請を登録</button>
+          </div>
+          <div class="card-body">
+            <div class="empty">面接申請の必須項目: 入学時期・語学学校滞在予定期間 / 個人情報 / 個人学歴 / 個人申請歴 / 経費支弁者情報</div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>番号</th>
+                  <th>氏名</th>
+                  <th>入学期</th>
+                  <th>現在ステップ</th>
+                  <th>不足/次アクション</th>
+                  <th>担当</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>LS26-041</td>
+                  <td>LI YAN</td>
+                  <td>2026年10月</td>
+                  <td><span class="badge blue">COE準備</span></td>
+                  <td>願書の出生地、経費支弁者の収入証明</td>
+                  <td>山田</td>
+                </tr>
+                <tr>
+                  <td>LS26-052</td>
+                  <td>TRAN ANH</td>
+                  <td>2026年10月</td>
+                  <td><span class="badge yellow">選考料確認</span></td>
+                  <td>エージェント代収の入金確認、領収書宛名確認</td>
+                  <td>佐藤</td>
+                </tr>
+                <tr>
+                  <td>LS26-067</td>
+                  <td>WANG HAO</td>
+                  <td>2026年7月</td>
+                  <td><span class="badge green">COE交付</span></td>
+                  <td>全額学費入金後、領収書発行、COE全体送付</td>
+                  <td>山田</td>
+                </tr>
+                <tr>
+                  <td>LS26-073</td>
+                  <td>NGUYEN HOA</td>
+                  <td>2026年7月</td>
+                  <td><span class="badge red">来日前準備</span></td>
+                  <td>日本住所、電話、口語テスト未完了</td>
+                  <td>田中</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="students" class="view hidden">
+        <div class="toolbar">
+          <input class="search" placeholder="学生番号、氏名、在留カード番号で検索">
+          <select>
+            <option>すべての状態</option>
+            <option>在学</option>
+            <option>退学</option>
+            <option>卒業</option>
+          </select>
+          <select>
+            <option>すべての学科</option>
+            <option>国際ビジネス科</option>
+            <option>ITビジネス科</option>
+            <option>日本語課程</option>
+          </select>
+          <button class="btn">CSV取込</button>
+          <button class="btn primary" data-open-modal="student">新規登録</button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">学生一覧</h2>
+            <span class="badge gray">428 件</span>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>学生番号</th>
+                  <th>氏名</th>
+                  <th>国籍</th>
+                  <th>所属</th>
+                  <th>在留期限</th>
+                  <th>出席率</th>
+                  <th>状態</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="clickable" data-view-target="studentDetail">
+                  <td>26V0018</td>
+                  <td>グエン ミン アン<br><span class="page-subtitle">NGUYEN MINH AN</span></td>
+                  <td>ベトナム</td>
+                  <td>国際ビジネス科 1A</td>
+                  <td><span class="badge red">2026-05-08</span></td>
+                  <td><span class="badge yellow">76.4%</span></td>
+                  <td><span class="badge green">在学</span></td>
+                </tr>
+                <tr class="clickable" data-view-target="studentDetail">
+                  <td>26C0042</td>
+                  <td>王 小雨<br><span class="page-subtitle">WANG XIAOYU</span></td>
+                  <td>中国</td>
+                  <td>ITビジネス科 1B</td>
+                  <td>2027-03-15</td>
+                  <td><span class="badge green">92.1%</span></td>
+                  <td><span class="badge green">在学</span></td>
+                </tr>
+                <tr>
+                  <td>25N0109</td>
+                  <td>ラマ シュレスタ</td>
+                  <td>ネパール</td>
+                  <td>日本語課程 B</td>
+                  <td>2026-12-01</td>
+                  <td><span class="badge red">42.8%</span></td>
+                  <td><span class="badge yellow">確認中</span></td>
+                </tr>
+                <tr>
+                  <td>24V0077</td>
+                  <td>チャン ティ ラン</td>
+                  <td>ベトナム</td>
+                  <td>国際ビジネス科 2A</td>
+                  <td>2026-07-20</td>
+                  <td><span class="badge gray">離脱</span></td>
+                  <td><span class="badge red">退学</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="studentDetail" class="view hidden">
+        <div class="card">
+          <div class="profile-head">
+            <div class="student-photo" aria-hidden="true"></div>
+            <div>
+              <h2 class="profile-name">グエン ミン アン</h2>
+              <div class="profile-meta">
+                <span>26V0018</span>
+                <span>ベトナム</span>
+                <span>国際ビジネス科 1A</span>
+                <span>在学</span>
+              </div>
+            </div>
+            <div class="toolbar" style="margin: 0;">
+              <button class="btn">編集</button>
+              <button class="btn warn">在留更新</button>
+              <button class="btn primary">証明書発行</button>
+            </div>
+          </div>
+          <div class="tabs">
+            <button class="active">概要</button>
+            <button>在留・旅券</button>
+            <button>出席</button>
+            <button>報告履歴</button>
+            <button>ファイル</button>
+          </div>
+          <div class="card-body">
+            <div class="info-grid">
+              <div class="info">
+                <div class="info-label">生年月日</div>
+                <div class="info-value">2003-08-12</div>
+              </div>
+              <div class="info">
+                <div class="info-label">日本住所</div>
+                <div class="info-value">東京都豊島区東池袋 2-18-5</div>
+              </div>
+              <div class="info">
+                <div class="info-label">在留カード番号</div>
+                <div class="info-value">AB12345678CD</div>
+              </div>
+              <div class="info">
+                <div class="info-label">在留期限</div>
+                <div class="info-value" style="color: var(--red)">2026-05-08</div>
+              </div>
+              <div class="info">
+                <div class="info-label">旅券番号</div>
+                <div class="info-value">C9876543</div>
+              </div>
+              <div class="info">
+                <div class="info-label">4月出席率</div>
+                <div class="info-value" style="color: var(--yellow)">76.4%</div>
+              </div>
+            </div>
+
+            <div class="grid two" style="margin-top: 14px;">
+              <div class="card" style="box-shadow: none;">
+                <div class="card-header">
+                  <h3 class="card-title">未完了チェック</h3>
+                </div>
+                <div class="card-body">
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>在留更新書類</td>
+                        <td><span class="badge red">未作成</span></td>
+                      </tr>
+                      <tr>
+                        <td>在留カード裏面画像</td>
+                        <td><span class="badge green">保存済み</span></td>
+                      </tr>
+                      <tr>
+                        <td>資格外活動勤務先</td>
+                        <td><span class="badge yellow">確認必要</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card" style="box-shadow: none;">
+                <div class="card-header">
+                  <h3 class="card-title">生成済みファイル</h3>
+                </div>
+                <div class="card-body timeline">
+                  <div class="timeline-item">
+                    <div class="timeline-date">04/18</div>
+                    <div>出席率証明書 PDF<br><span class="page-subtitle">発行者: 山田</span></div>
+                  </div>
+                  <div class="timeline-item">
+                    <div class="timeline-date">04/02</div>
+                    <div>在留カード画像<br><span class="page-subtitle">正面・裏面</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="attendance" class="view hidden">
+        <div class="toolbar">
+          <select><option>2026年4月</option></select>
+          <select><option>国際ビジネス科 1A</option></select>
+          <button class="btn">再計算</button>
+          <button class="btn primary" data-open-modal="report">50%未満報告を作成</button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">月度出席率</h2>
+            <span class="badge yellow">7名 報告候補</span>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>学生番号</th>
+                  <th>氏名</th>
+                  <th>要出席</th>
+                  <th>出席</th>
+                  <th>出席率</th>
+                  <th>判定</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>25N0109</td>
+                  <td>ラマ シュレスタ</td>
+                  <td>5,400 分</td>
+                  <td>2,310 分</td>
+                  <td><span class="badge red">42.8%</span></td>
+                  <td>入管報告候補</td>
+                </tr>
+                <tr>
+                  <td>26V0018</td>
+                  <td>グエン ミン アン</td>
+                  <td>5,400 分</td>
+                  <td>4,126 分</td>
+                  <td><span class="badge yellow">76.4%</span></td>
+                  <td>校内注意</td>
+                </tr>
+                <tr>
+                  <td>26C0042</td>
+                  <td>王 小雨</td>
+                  <td>5,400 分</td>
+                  <td>4,973 分</td>
+                  <td><span class="badge green">92.1%</span></td>
+                  <td>正常</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="visa" class="view hidden">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">在留期限管理</h2>
+          <button class="btn primary" data-open-modal="visaDocs">更新書類を一括生成</button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>学生</th>
+                  <th>在留資格</th>
+                  <th>在留期限</th>
+                  <th>残日数</th>
+                  <th>更新状態</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>グエン ミン アン</td>
+                  <td>留学</td>
+                  <td>2026-05-08</td>
+                  <td><span class="badge red">18日</span></td>
+                  <td><span class="badge red">未着手</span></td>
+                </tr>
+                <tr>
+                  <td>金 ソヨン</td>
+                  <td>留学</td>
+                  <td>2026-06-01</td>
+                  <td><span class="badge yellow">42日</span></td>
+                  <td><span class="badge blue">学生確認中</span></td>
+                </tr>
+                <tr>
+                  <td>王 小雨</td>
+                  <td>留学</td>
+                  <td>2027-03-15</td>
+                  <td><span class="badge green">329日</span></td>
+                  <td><span class="badge gray">対象外</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="reports" class="view hidden">
+        <div class="toolbar">
+          <select><option>すべての報告</option></select>
+          <select><option>すべての状態</option></select>
+          <button class="btn">候補を自動抽出</button>
+          <button class="btn primary" data-open-modal="report">新規報告</button>
+        </div>
+        <div class="grid two">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">入管報告一覧</h2>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>報告名</th>
+                    <th>対象期間</th>
+                    <th>件数</th>
+                    <th>期限</th>
+                    <th>状態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>出席率5割未満報告</td>
+                    <td>2026年4月</td>
+                    <td>7</td>
+                    <td>2026-05-31</td>
+                    <td><span class="badge yellow">確認待ち</span></td>
+                  </tr>
+                  <tr>
+                    <td>退学した生徒に係る報告</td>
+                    <td>2026年3月</td>
+                    <td>1</td>
+                    <td>2026-04-30</td>
+                    <td><span class="badge red">期限間近</span></td>
+                  </tr>
+                  <tr>
+                    <td>半年度出席率報告</td>
+                    <td>2025/10-2026/03</td>
+                    <td>392</td>
+                    <td>2026-06-30</td>
+                    <td><span class="badge blue">作成中</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">報告フロー</h2>
+            </div>
+            <div class="card-body">
+              <div class="report-flow">
+                <div class="flow-step done">
+                  <div class="flow-title">候補抽出</div>
+                  <div class="flow-note">7名</div>
+                </div>
+                <div class="flow-step current">
+                  <div class="flow-title">内容確認</div>
+                  <div class="flow-note">勤務先 2件確認</div>
+                </div>
+                <div class="flow-step">
+                  <div class="flow-title">Excel生成</div>
+                  <div class="flow-note">未生成</div>
+                </div>
+                <div class="flow-step">
+                  <div class="flow-title">提出記録</div>
+                  <div class="flow-note">未提出</div>
+                </div>
+                <div class="flow-step">
+                  <div class="flow-title">完了</div>
+                  <div class="flow-note">受理後</div>
+                </div>
+              </div>
+              <div style="margin-top: 14px;">
+                <button class="btn primary" data-open-modal="report">固定フォーマット生成</button>
+                <button class="btn">添付ファイル追加</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="certificates" class="view hidden">
+        <div class="toolbar">
+          <input class="search" placeholder="学生を検索">
+          <select>
+            <option>出席率証明書</option>
+            <option>成績証明書</option>
+            <option>修了証明書</option>
+            <option>在学証明書</option>
+          </select>
+          <button class="btn primary" data-open-modal="certificate">証明書を発行</button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">証明書発行履歴</h2>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>番号</th>
+                  <th>学生</th>
+                  <th>種類</th>
+                  <th>発行者</th>
+                  <th>発行日時</th>
+                  <th>状態</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>2026-ATT-0048</td>
+                  <td>王 小雨</td>
+                  <td>出席率証明書</td>
+                  <td>山田</td>
+                  <td>2026-04-20 09:42</td>
+                  <td><span class="badge green">発行済</span></td>
+                </tr>
+                <tr>
+                  <td>2026-GRD-0012</td>
+                  <td>グエン ミン アン</td>
+                  <td>成績証明書</td>
+                  <td>佐藤</td>
+                  <td>2026-04-18 15:10</td>
+                  <td><span class="badge green">発行済</span></td>
+                </tr>
+                <tr>
+                  <td>2026-CMP-0007</td>
+                  <td>チャン ティ ラン</td>
+                  <td>修了見込証明書</td>
+                  <td>山田</td>
+                  <td>2026-04-12 11:03</td>
+                  <td><span class="badge gray">無効</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="templates" class="view hidden">
+        <div class="toolbar">
+          <button class="btn">サンプル生成</button>
+          <button class="btn primary">テンプレート追加</button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">テンプレート管理</h2>
+            <span class="badge gray">Excel / Word / PDF</span>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>コード</th>
+                  <th>名称</th>
+                  <th>種類</th>
+                  <th>形式</th>
+                  <th>版</th>
+                  <th>状態</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>LOW_ATT_2026</td>
+                  <td>出席率5割未満報告</td>
+                  <td>入管報告</td>
+                  <td>xlsx</td>
+                  <td>v3</td>
+                  <td><span class="badge green">有効</span></td>
+                </tr>
+                <tr>
+                  <td>VISA_RENEWAL_5</td>
+                  <td>在留更新五表</td>
+                  <td>在留更新</td>
+                  <td>xlsx</td>
+                  <td>v1</td>
+                  <td><span class="badge yellow">確認中</span></td>
+                </tr>
+                <tr>
+                  <td>CERT_ATT_JA</td>
+                  <td>出席率証明書</td>
+                  <td>証明書</td>
+                  <td>docx</td>
+                  <td>v2</td>
+                  <td><span class="badge green">有効</span></td>
+                </tr>
+                <tr>
+                  <td>ROSTER_CLASS_NEW</td>
+                  <td>クラス名簿（新）</td>
+                  <td>名簿</td>
+                  <td>xlsx</td>
+                  <td>v1</td>
+                  <td><span class="badge green">有効</span></td>
+                </tr>
+                <tr>
+                  <td>ATT_BOOK_NEW</td>
+                  <td>出席簿（新）</td>
+                  <td>出席</td>
+                  <td>xlsx</td>
+                  <td>v1</td>
+                  <td><span class="badge blue">準備中</span></td>
+                </tr>
+                <tr>
+                  <td>EXAM_NOTICE_01</td>
+                  <td>定期試験結果通知①</td>
+                  <td>試験結果</td>
+                  <td>xlsx</td>
+                  <td>v1</td>
+                  <td><span class="badge yellow">確認中</span></td>
+                </tr>
+                <tr>
+                  <td>ANNUAL_COMPLETION_SUMMARY</td>
+                  <td>年度終了報告・報告様式</td>
+                  <td>年度終了報告</td>
+                  <td>xlsx</td>
+                  <td>v1</td>
+                  <td><span class="badge green">有効</span></td>
+                </tr>
+                <tr>
+                  <td>ANNUAL_COMPLETION_LIST</td>
+                  <td>年度終了報告・リスト</td>
+                  <td>年度終了報告</td>
+                  <td>xlsx</td>
+                  <td>v1</td>
+                  <td><span class="badge green">有効</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="migration" class="view hidden">
+        <div class="grid two">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">旧システム Excel 移行</h2>
+              <button class="btn primary">Excelをアップロード</button>
+            </div>
+            <div class="card-body step-list">
+              <div class="step-row">
+                <div class="step-no">1</div>
+                <div><strong>Excel取込</strong><div class="page-subtitle">旧システムから出力した学生台帳をアップロード</div></div>
+                <span class="badge green">対応</span>
+              </div>
+              <div class="step-row">
+                <div class="step-no">2</div>
+                <div><strong>項目マッピング</strong><div class="page-subtitle">旧項目を SchoolCore の学生・在留・住所項目へ対応</div></div>
+                <span class="badge blue">確認</span>
+              </div>
+              <div class="step-row">
+                <div class="step-no">3</div>
+                <div><strong>データチェック</strong><div class="page-subtitle">重複、日付不正、在留期限、クラス未対応を検出</div></div>
+                <span class="badge yellow">警告</span>
+              </div>
+              <div class="step-row">
+                <div class="step-no">4</div>
+                <div><strong>試験インポート</strong><div class="page-subtitle">本番反映前に結果レポートを確認</div></div>
+                <span class="badge gray">未実行</span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">直近の検証結果</h2>
+              <span class="badge yellow">要確認 18件</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <table>
+                <thead>
+                  <tr><th>区分</th><th>件数</th><th>例</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>重複候補</td><td>4</td><td>学生番号またはパスポート番号一致</td></tr>
+                  <tr><td>日付不正</td><td>3</td><td>在留期限が文字列</td></tr>
+                  <tr><td>住所不足</td><td>7</td><td>日本住所未入力</td></tr>
+                  <tr><td>クラス未対応</td><td>4</td><td>旧クラス名が未登録</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="settings" class="view hidden">
+        <div class="grid two">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">学校設定</h2>
+            </div>
+            <div class="card-body info-grid">
+              <div class="info">
+                <div class="info-label">学校名</div>
+                <div class="info-value">東京未来専門学校</div>
+              </div>
+              <div class="info">
+                <div class="info-label">学校タイプ</div>
+                <div class="info-value">専門学校 / 留学生多数</div>
+              </div>
+              <div class="info">
+                <div class="info-label">管轄入管</div>
+                <div class="info-value">東京出入国在留管理局</div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">有効モジュール</h2>
+            </div>
+            <div class="card-body">
+              <span class="badge green">Core</span>
+              <span class="badge green">Visa</span>
+              <span class="badge green">Attendance</span>
+              <span class="badge green">Immigration Report</span>
+              <span class="badge green">Certificate</span>
+              <span class="badge blue">Admission</span>
+              <span class="badge blue">Academic</span>
+              <span class="badge blue">Finance</span>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top: 14px;">
+          <div class="card-header">
+            <h2 class="card-title">権限概要</h2>
+            <span class="badge gray">Confirmed</span>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>操作</th>
+                  <th>staff</th>
+                  <th>入管報告担当</th>
+                  <th>manager</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>学生基本情報の編集</td><td><span class="badge green">可</span></td><td>staff 兼任時可</td><td><span class="badge green">可</span></td></tr>
+                <tr><td>旅券・在留カード・COE の閲覧/ダウンロード</td><td><span class="badge green">可</span></td><td>staff 兼任時可</td><td><span class="badge green">可</span></td></tr>
+                <tr><td>AIチェックの実行/確認</td><td><span class="badge green">可</span></td><td>staff 兼任時可</td><td><span class="badge green">可</span></td></tr>
+                <tr><td>入管提出ファイル生成 / 提出済み登録</td><td><span class="badge gray">不可</span></td><td><span class="badge green">可</span></td><td><span class="badge green">可</span></td></tr>
+                <tr><td>学費入金確認 / 領収書発行 / COE全体送付</td><td><span class="badge green">可</span></td><td>staff 兼任時可</td><td><span class="badge green">可</span></td></tr>
+                <tr><td>証明書・領収書の無効化</td><td><span class="badge green">可</span></td><td>staff 兼任時可</td><td><span class="badge green">可</span></td></tr>
+                <tr><td>新規アカウント発行</td><td><span class="badge gray">不可</span></td><td><span class="badge gray">不可</span></td><td><span class="badge green">可</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="margin-top: 14px;">
+          <div class="card-header">
+            <h2 class="card-title">業務ルール設定</h2>
+            <span class="badge green">Confirmed</span>
+          </div>
+          <div class="card-body info-grid">
+            <div class="info">
+              <div class="info-label">選考料</div>
+              <div class="info-value">20,000円</div>
+            </div>
+            <div class="info">
+              <div class="info-label">入学時期</div>
+              <div class="info-value">1月 / 4月 / 7月 / 10月・短期は随時</div>
+            </div>
+            <div class="info">
+              <div class="info-label">学生番号</div>
+              <div class="info-value">入学年月 + 3桁ランダム</div>
+            </div>
+            <div class="info">
+              <div class="info-label">証明書番号</div>
+              <div class="info-value">発行年月日 + 3桁ランダム</div>
+            </div>
+            <div class="info">
+              <div class="info-label">出席率計算</div>
+              <div class="info-value">遅刻・早退・公欠は学校ごとに設定</div>
+            </div>
+            <div class="info">
+              <div class="info-label">出席簿</div>
+              <div class="info-value">時限単位を優先、日単位も対応</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="roadmap" class="view hidden">
+        <div class="grid stats">
+          <div class="card stat">
+            <div class="stat-label">Phase 1 目標</div>
+            <div class="stat-value">Beta</div>
+            <div class="stat-note">出願から在籍管理まで一気通貫</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">最優先</div>
+            <div class="stat-value">P0</div>
+            <div class="stat-note">学生台帳・ファイル・権限・監査ログ</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">帳票</div>
+            <div class="stat-value">3</div>
+            <div class="stat-note">最初に自動生成する様式を確定</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">未確定</div>
+            <div class="stat-value">8</div>
+            <div class="stat-note">領収書番号、様式、AI基準など</div>
+          </div>
+        </div>
+        <div class="grid two" style="margin-top: 14px;">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Phase 1 実装順</h2>
+              <span class="badge green">Recommended</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <table>
+                <thead>
+                  <tr><th>Milestone</th><th>内容</th><th>完了条件</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>1. 基盤</td><td>権限、学校設定、学生/出願者台帳、ファイル、監査ログ</td><td>staff が学生と書類を登録できる</td></tr>
+                  <tr><td>2. COE</td><td>面接申請、選考料、面接結果、合格通知、AIチェック</td><td>不足項目を確認して COE ケースを進められる</td></tr>
+                  <tr><td>3. 入金/領収書</td><td>入金確認、領収書、無効化/再発行、COE全体送付制御</td><td>全額入金前は COE 全体を送付できない</td></tr>
+                  <tr><td>4. 出席/入管報告</td><td>時限出席、出席率計算、5割報告、離脱届、半期/年次報告</td><td>候補抽出と固定様式生成ができる</td></tr>
+                  <tr><td>5. 証明書/ポータル/移行</td><td>証明書申請承認、学生ポータル、旧 Excel 試験取込</td><td>学生は承認済み書類だけダウンロードできる</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="grid">
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">確定済みルール</h2>
+              </div>
+              <div class="card-body info-grid">
+                <div class="info">
+                  <div class="info-label">面接結果</div>
+                  <div class="info-value">合格 / 保留 / 再面接 / 不合格</div>
+                </div>
+                <div class="info">
+                  <div class="info-label">選考料</div>
+                  <div class="info-value">20,000円</div>
+                </div>
+                <div class="info">
+                  <div class="info-label">COE全体送付</div>
+                  <div class="info-value">全額入金と領収書発行後</div>
+                </div>
+                <div class="info">
+                  <div class="info-label">出席率計算</div>
+                  <div class="info-value">学校ごとに設定</div>
+                </div>
+                <div class="info">
+                  <div class="info-label">学生番号</div>
+                  <div class="info-value">入学年月 + 3桁</div>
+                </div>
+                <div class="info">
+                  <div class="info-label">学生DL</div>
+                  <div class="info-value">申請後、staff 承認</div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">実装前に決めること</h2>
+                <span class="badge yellow">Next</span>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <table>
+                  <tbody>
+                    <tr><td>領収書番号の最終形式</td><td>会計・法務書類の番号規則</td></tr>
+                    <tr><td>最初に対応する校舎</td><td>テンプレート差分の基準</td></tr>
+                    <tr><td>最初の自動生成帳票</td><td>入管報告/領収書/合格通知から選定</td></tr>
+                    <tr><td>本番データ保管方針</td><td>旅券、在留カード、COE の安全管理</td></tr>
+                    <tr><td>AIチェック基準</td><td>次版で Error / Warning を確定</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div id="modalBackdrop" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+        <div class="modal" id="modalBox">
+          <div class="modal-header">
+            <h2 class="modal-title" id="modalTitle">Demo</h2>
+            <button class="close" id="modalClose" aria-label="Close">x</button>
+          </div>
+          <div class="card-body" id="modalContent"></div>
+          <div class="modal-footer" id="modalFooter">
+            <button class="btn" id="modalCancel">閉じる</button>
+            <button class="btn primary" id="modalPrimary">保存</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="toast" class="toast hidden"></div>
+    </main>
+  </div>
+
+  <script>
+    const titles = {
+      dashboard: ["Dashboard", "本日の確認事項と提出期限"],
+      admission: ["Web出願", "Google Form と紙の手続を置き換える入口"],
+      studentPortal: ["出願者ポータル", "出願者が安心して手続を進めるための外部ポータル"],
+      enrolledStudentPortal: ["在籍生ポータル", "入学後の出席、証明書、在留更新、お知らせを確認"],
+      coeWorkflow: ["COE進行", "面接申請からクラス分け・入学までの語学学校ワークフロー"],
+      students: ["学生管理", "在籍生、終了生、退学生を一元管理"],
+      studentDetail: ["学生詳細", "学生情報、在留、出席、証明書、報告履歴"],
+      attendance: ["出席管理", "月度出席率と入管報告候補を確認"],
+      visa: ["在留管理", "在留期限、更新案件、資格外活動を管理"],
+      reports: ["入管報告", "候補抽出、固定フォーマット生成、提出記録"],
+      certificates: ["証明書", "ワンクリック発行と発行履歴の保存"],
+      templates: ["テンプレート", "入管様式と証明書様式のフィールド対応"],
+      migration: ["データ移行", "旧システム Excel からの取込、検証、試験インポート"],
+      settings: ["設定", "学校情報、コース、権限、報告ルール"],
+      roadmap: ["開発計画", "Phase 1 の実装順、確定済みルール、未決事項"]
+    };
+
+    const modalTemplates = {
+      student: {
+        title: "新規学生登録",
+        primary: "学生台帳に保存",
+        content: `
+          <div class="form-grid">
+            <div class="field">
+              <label>学生番号</label>
+              <input value="26V0125">
+            </div>
+            <div class="field">
+              <label>状態</label>
+              <select><option>在学</option><option>入学前</option><option>休学</option></select>
+            </div>
+            <div class="field">
+              <label>氏名</label>
+              <input value="LE THI MAI">
+            </div>
+            <div class="field">
+              <label>カナ</label>
+              <input value="レ ティ マイ">
+            </div>
+            <div class="field">
+              <label>生年月日</label>
+              <input type="date" value="2004-02-11">
+            </div>
+            <div class="field">
+              <label>国籍</label>
+              <select><option>ベトナム</option><option>中国</option><option>ネパール</option><option>韓国</option></select>
+            </div>
+            <div class="field">
+              <label>所属</label>
+              <select><option>国際ビジネス科 1A</option><option>ITビジネス科 1B</option><option>日本語課程 B</option></select>
+            </div>
+            <div class="field">
+              <label>在留期限</label>
+              <input type="date" value="2027-04-10">
+            </div>
+            <div class="field full">
+              <label>日本住所</label>
+              <input value="東京都新宿区百人町 1-2-3">
+            </div>
+            <div class="field">
+              <label>在留カード正面</label>
+              <input type="file">
+            </div>
+            <div class="field">
+              <label>在留カード裏面</label>
+              <input type="file">
+            </div>
+          </div>
+          <div class="empty" style="margin-top: 14px;">保存時に住所、在留カード番号、旅券、所属クラス、必須画像の不足を自動チェックします。</div>
+        `,
+        toast: "学生台帳を保存しました。未提出ファイル 2 件をチェックリストに追加しました。"
+      },
+      report: {
+        title: "入管報告を作成",
+        primary: "固定フォーマット生成",
+        content: `
+          <div class="form-grid">
+            <div class="field">
+              <label>報告種類</label>
+              <select><option>出席率5割未満報告</option><option>退学した生徒に係る報告</option><option>半年度出席率報告</option><option>年度終了報告</option></select>
+            </div>
+            <div class="field">
+              <label>対象期間</label>
+              <select><option>2026年4月</option><option>2025年10月-2026年3月</option><option>2026年度</option></select>
+            </div>
+            <div class="field">
+              <label>対象条件</label>
+              <input value="月出席率 50% 未満">
+            </div>
+            <div class="field">
+              <label>提出期限</label>
+              <input type="date" value="2026-05-31">
+            </div>
+          </div>
+          <div style="margin-top: 14px;">
+            <table>
+              <thead>
+                <tr><th>学生</th><th>出席率</th><th>チェック</th><th>状態</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>ラマ シュレスタ</td><td>42.8%</td><td>勤務先確認</td><td><span class="badge yellow">要確認</span></td></tr>
+                <tr><td>PHAM VAN NAM</td><td>38.2%</td><td>住所不足</td><td><span class="badge red">不備</span></td></tr>
+                <tr><td>KIM JIWON</td><td>49.5%</td><td>OK</td><td><span class="badge green">生成可</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        `,
+        toast: "入管報告ファイルを生成しました。3 件のうち 1 件は不備確認が必要です。"
+      },
+      certificate: {
+        title: "証明書発行プレビュー",
+        primary: "番号を採番して発行",
+        content: `
+          <div class="grid two">
+            <div class="form-grid">
+              <div class="field full">
+                <label>学生</label>
+                <select><option>王 小雨 / 26C0042</option><option>グエン ミン アン / 26V0018</option></select>
+              </div>
+              <div class="field full">
+                <label>証明書種類</label>
+                <select><option>出席率証明書</option><option>成績証明書</option><option>在学証明書</option><option>卒業見込証明書</option></select>
+              </div>
+              <div class="field">
+                <label>期間開始</label>
+                <input type="date" value="2026-04-01">
+              </div>
+              <div class="field">
+                <label>期間終了</label>
+                <input type="date" value="2026-04-30">
+              </div>
+              <div class="field full">
+                <label>用途</label>
+                <input value="在留期間更新申請">
+              </div>
+            </div>
+            <div class="preview-paper">
+              <div class="paper-title">出席率証明書</div>
+              <div class="paper-lines">
+                <div>学生番号: 26C0042</div>
+                <div>氏名: 王 小雨</div>
+                <div>国籍: 中国</div>
+                <div>対象期間: 2026年4月1日 - 2026年4月30日</div>
+                <div>要出席時間: 5,400分</div>
+                <div>出席時間: 4,973分</div>
+                <div>出席率: 92.1%</div>
+                <div style="margin-top: 22px; text-align: right;">東京未来専門学校</div>
+              </div>
+            </div>
+          </div>
+        `,
+        toast: "証明書番号 2026-ATT-0049 を採番し、発行履歴に保存しました。"
+      },
+      application: {
+        title: "学生用 Web出願フォーム",
+        primary: "出願を送信",
+        content: `
+          <div class="form-grid">
+            <div class="field">
+              <label>志望学科</label>
+              <select><option>国際ビジネス科</option><option>ITビジネス科</option><option>日本語課程</option></select>
+            </div>
+            <div class="field">
+              <label>入学期</label>
+              <select><option>2026年10月入学</option><option>2027年4月入学</option></select>
+            </div>
+            <div class="field">
+              <label>氏名</label>
+              <input value="LE THI MAI">
+            </div>
+            <div class="field">
+              <label>メール</label>
+              <input value="mai.le@example.com">
+            </div>
+            <div class="field">
+              <label>国籍</label>
+              <select><option>ベトナム</option><option>中国</option><option>ネパール</option></select>
+            </div>
+            <div class="field">
+              <label>生年月日</label>
+              <input type="date" value="2004-02-11">
+            </div>
+            <div class="field full">
+              <label>最終学歴</label>
+              <input value="Hanoi Foreign Language College / 2025年卒業">
+            </div>
+            <div class="field">
+              <label>証明写真</label>
+              <input type="file">
+            </div>
+            <div class="field">
+              <label>パスポート</label>
+              <input type="file">
+            </div>
+            <div class="field full">
+              <label>確認事項</label>
+              <textarea>入力内容に間違いがないことを確認しました。</textarea>
+            </div>
+          </div>
+        `,
+        toast: "出願番号 A26-0128 を発行しました。書類審査リストに追加しました。"
+      },
+      visaDocs: {
+        title: "在留更新書類を生成",
+        primary: "五表と附加書類を生成",
+        content: `
+          <div class="step-list">
+            <div class="step-row">
+              <div class="step-no">1</div>
+              <div><strong>対象抽出</strong><div class="page-subtitle">在留期限 90 日以内の学生を抽出</div></div>
+              <span class="badge green">18名</span>
+            </div>
+            <div class="step-row">
+              <div class="step-no">2</div>
+              <div><strong>情報チェック</strong><div class="page-subtitle">住所、旅券、在留カード、出席率、成績を確認</div></div>
+              <span class="badge yellow">5件注意</span>
+            </div>
+            <div class="step-row">
+              <div class="step-no">3</div>
+              <div><strong>書類生成</strong><div class="page-subtitle">在留更新五表、在学証明、成績証明、出席証明</div></div>
+              <span class="badge blue">準備中</span>
+            </div>
+          </div>
+        `,
+        toast: "在留更新書類を生成しました。5名は住所または出席率の確認が必要です。"
+      },
+      receipt: {
+        title: "領収書を自動発行",
+        primary: "領収書番号を採番して発行",
+        content: `
+          <div class="grid two">
+            <div class="form-grid">
+              <div class="field full">
+                <label>対象学生</label>
+                <select><option>WANG HAO / LS26-067</option><option>LI YAN / LS26-041</option></select>
+              </div>
+              <div class="field">
+                <label>入金区分</label>
+              <select><option>全額学費</option><option>選考料</option><option>学費一部入金</option><option>エージェント代収</option></select>
+              </div>
+              <div class="field">
+                <label>金額</label>
+                <input value="877,000 円">
+              </div>
+              <div class="field">
+                <label>入金日</label>
+                <input type="date" value="2026-04-20">
+              </div>
+              <div class="field">
+                <label>支払方法</label>
+                <select><option>銀行振込</option><option>現金</option><option>エージェント代収</option></select>
+              </div>
+              <div class="field">
+                <label>表示名</label>
+                <input value="SGG留学サポート">
+              </div>
+              <div class="field">
+                <label>発行者</label>
+                <input value="事務局 山田">
+              </div>
+              <div class="field full">
+                <label>備考</label>
+              <input value="全額学費入金確認済。発行後、COE全体送付可。">
+              </div>
+            </div>
+            <div class="preview-paper">
+              <div class="paper-title">領収書</div>
+              <div class="paper-lines">
+                <div>領収書番号: 2026-RC-0088</div>
+                <div>宛名: SGG留学サポート</div>
+                <div>対象学生: WANG HAO</div>
+                <div>但し: 2026年7月期 学費として</div>
+                <div>金額: 877,000 円</div>
+                <div>入金日: 2026年4月20日</div>
+                <div>支払方法: エージェント代収</div>
+                <div style="margin-top: 22px; text-align: right;">渋谷外語学院 高田馬場校</div>
+              </div>
+            </div>
+          </div>
+          <div class="empty" style="margin-top: 14px;">領収書番号は発行日と入学時期から自動採番します。選考料、一部入金、全額入金の領収書を発行でき、無効化と再発行の履歴を保持します。COE全体は全額学費確認後のみ送付できます。</div>
+        `,
+        toast: "領収書 2026-RC-0088 を発行しました。COE全体の送付が可能になりました。"
+      },
+      aiCoeCheck: {
+        title: "AI COE申請材料チェック",
+        primary: "チェック結果を保存",
+        content: `
+          <div class="grid stats">
+            <div class="card stat" style="box-shadow: none;">
+              <div class="stat-label">チェック対象</div>
+              <div class="stat-value">12</div>
+              <div class="stat-note">願書・旅券・経費資料</div>
+            </div>
+            <div class="card stat" style="box-shadow: none;">
+              <div class="stat-label">重大エラー</div>
+              <div class="stat-value" style="color: var(--red)">2</div>
+              <div class="stat-note">提出前に修正必須</div>
+            </div>
+            <div class="card stat" style="box-shadow: none;">
+              <div class="stat-label">警告</div>
+              <div class="stat-value" style="color: var(--yellow)">5</div>
+              <div class="stat-note">事務確認</div>
+            </div>
+            <div class="card stat" style="box-shadow: none;">
+              <div class="stat-label">一致確認</div>
+              <div class="stat-value" style="color: var(--green)">28</div>
+              <div class="stat-note">自動確認済み</div>
+            </div>
+          </div>
+          <div style="margin-top: 14px;">
+            <table>
+              <thead>
+                <tr><th>重要度</th><th>項目</th><th>AIチェック内容</th><th>対応</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge red">Error</span></td>
+                  <td>旅券番号</td>
+                  <td>面接申請表は未入力、願書には E12345678 と記載されています。旅券原本を基準に確認してください。</td>
+                  <td>確認後、主台帳を更新</td>
+                </tr>
+                <tr>
+                  <td><span class="badge red">Error</span></td>
+                  <td>経費支弁者</td>
+                  <td>母が経費支弁者として記載されていますが、収入証明書が未確認です。</td>
+                  <td>収入証明書を追加提出</td>
+                </tr>
+                <tr>
+                  <td><span class="badge yellow">Warn</span></td>
+                  <td>学歴履歴</td>
+                  <td>高校卒業から日本語学習開始まで 8 か月の空白があります。</td>
+                  <td>理由説明を確認</td>
+                </tr>
+                <tr>
+                  <td><span class="badge yellow">Warn</span></td>
+                  <td>氏名表記</td>
+                  <td>面接表は LI YAN、旅券OCRは LI YANH と認識されています。目視確認が必要です。</td>
+                  <td>旅券原本を確認</td>
+                </tr>
+                <tr>
+                  <td><span class="badge green">OK</span></td>
+                  <td>生年月日/国籍</td>
+                  <td>面接表、願書、旅券の情報が一致しています。</td>
+                  <td>対応不要</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="empty" style="margin-top: 14px;">AIチェックは事務確認の補助です。最終的な入管判断ではありません。提出前に必ず担当者が確認してください。</div>
+        `,
+        toast: "AI COEチェック結果を保存しました。重大エラー 2 件は提出前に確認が必要です。"
+      }
+    };
+
+    function showView(id) {
+      document.querySelectorAll(".view").forEach(view => {
+        view.classList.toggle("hidden", view.id !== id);
+      });
+      document.querySelectorAll(".nav button").forEach(button => {
+        button.classList.toggle("active", button.dataset.view === id);
+      });
+      const title = titles[id] || titles.dashboard;
+      document.getElementById("pageTitle").textContent = title[0];
+      document.getElementById("pageSubtitle").textContent = title[1];
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    document.querySelectorAll("[data-view]").forEach(button => {
+      button.addEventListener("click", () => showView(button.dataset.view));
+    });
+
+    document.querySelectorAll("[data-view-target]").forEach(item => {
+      item.addEventListener("click", () => showView(item.dataset.viewTarget));
+    });
+
+    const modalBackdrop = document.getElementById("modalBackdrop");
+    const modalBox = document.getElementById("modalBox");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalContent = document.getElementById("modalContent");
+    const modalPrimary = document.getElementById("modalPrimary");
+    const toast = document.getElementById("toast");
+    let activeModal = null;
+
+    function openModal(key) {
+      const template = modalTemplates[key];
+      if (!template) return;
+      activeModal = template;
+      modalTitle.textContent = template.title;
+      modalContent.innerHTML = template.content;
+      modalPrimary.textContent = template.primary;
+      modalBox.classList.toggle("small", key === "visaDocs");
+      modalBackdrop.classList.remove("hidden");
+    }
+
+    function closeModal() {
+      modalBackdrop.classList.add("hidden");
+      activeModal = null;
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.remove("hidden");
+      window.setTimeout(() => toast.classList.add("hidden"), 3200);
+    }
+
+    document.querySelectorAll("[data-open-modal]").forEach(item => {
+      item.addEventListener("click", () => openModal(item.dataset.openModal));
+    });
+
+    document.getElementById("modalClose").addEventListener("click", closeModal);
+    document.getElementById("modalCancel").addEventListener("click", closeModal);
+    modalBackdrop.addEventListener("click", event => {
+      if (event.target === modalBackdrop) closeModal();
+    });
+    modalPrimary.addEventListener("click", () => {
+      if (activeModal) showToast(activeModal.toast);
+      closeModal();
+    });
+  </script>
+</body>
+</html>
