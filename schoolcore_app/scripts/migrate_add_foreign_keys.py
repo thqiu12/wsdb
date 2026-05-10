@@ -10,9 +10,15 @@
 冪等: 既に新スキーマと一致するテーブルはスキップする。
 失敗時はバックアップを残して終了するので手動復旧可能。
 
+学生ポータルセッション (student_portal_sessions) は portal.py の TTL を
+UTC ベースに変更したため、デフォルトで全削除する。expires_at の旧形式
+(local time, TZ なし) と新形式 (UTC + offset) の文字列比較が境界で
+おかしくなるのを防ぐため。学生は次回アクセス時に再ログインが必要。
+
 Usage:
     python3 schoolcore_app/scripts/migrate_add_foreign_keys.py
     python3 schoolcore_app/scripts/migrate_add_foreign_keys.py --dry-run
+    python3 schoolcore_app/scripts/migrate_add_foreign_keys.py --keep-sessions
 """
 from __future__ import annotations
 
@@ -70,7 +76,19 @@ def backup_db(db_path: Path) -> Path:
     return backup
 
 
-def migrate(db_path: Path, dry_run: bool = False) -> int:
+def clear_portal_sessions(cur: sqlite3.Cursor) -> int:
+    """student_portal_sessions を空にして件数を返す。テーブルがなければ 0。"""
+    exists = cur.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='student_portal_sessions'"
+    ).fetchone()
+    if not exists:
+        return 0
+    count = cur.execute("SELECT COUNT(*) FROM student_portal_sessions").fetchone()[0]
+    cur.execute("DELETE FROM student_portal_sessions")
+    return count
+
+
+def migrate(db_path: Path, dry_run: bool = False, keep_sessions: bool = False) -> int:
     if not db_path.exists():
         print(f"[skip] DB が存在しません: {db_path}")
         return 0
@@ -85,6 +103,8 @@ def migrate(db_path: Path, dry_run: bool = False) -> int:
         print("[dry-run] 実行内容:")
         print(f"  - backup: {db_path} -> {db_path}.bak.<ts>")
         print(f"  - rebuild: {', '.join(fk_target_tables)}")
+        if not keep_sessions:
+            print("  - clear: student_portal_sessions (学生は再ログイン必要)")
         return 0
 
     backup = backup_db(db_path)
@@ -138,6 +158,14 @@ def migrate(db_path: Path, dry_run: bool = False) -> int:
         if skipped:
             print(f"[ok] skipped (already had FK): {len(skipped)} tables")
 
+        if not keep_sessions:
+            cleared = clear_portal_sessions(cur)
+            conn.commit()
+            print(f"[ok] cleared student_portal_sessions: {cleared} rows (学生は再ログイン必要)")
+        else:
+            print("[skip] --keep-sessions 指定。旧形式の expires_at が残っているため、")
+            print("       UTC 切り替えの境界で 6-12 時間程度セッション判定が不安定になる場合あり。")
+
         violations = cur.execute("PRAGMA foreign_key_check").fetchall()
         if violations:
             print(f"[warn] FK 違反データを {len(violations)} 件検出（既存の dangling 参照）:")
@@ -167,8 +195,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--db", type=Path, default=DB_PATH, help=f"default: {DB_PATH}")
+    parser.add_argument(
+        "--keep-sessions", action="store_true",
+        help="student_portal_sessions を削除しない（推奨外、互換性検証用）",
+    )
     args = parser.parse_args()
-    return migrate(args.db, dry_run=args.dry_run)
+    return migrate(args.db, dry_run=args.dry_run, keep_sessions=args.keep_sessions)
 
 
 if __name__ == "__main__":

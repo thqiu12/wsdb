@@ -128,6 +128,12 @@ with FKs, preserves all existing rows (including dangling references,
 which are reported afterwards via `PRAGMA foreign_key_check`). The
 migration is idempotent — tables already carrying FKs are skipped.
 
+By default the script also clears `student_portal_sessions` so all
+students re-login under the new UTC-based expiry format. Pass
+`--keep-sessions` if you need to preserve them (boundary checks
+between old TZ-naive and new UTC-aware ISO strings can misbehave for
+6–12h after deploy, hence the default).
+
 ## Reset Demo Data
 
 Stop the server, delete the database file, and start the server again.
