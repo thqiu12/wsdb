@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+"""
+LEGACY: SchoolCore standalone http.server implementation.
+
+This 7700-line single-file server is the original production stack.
+The active migration target is the FastAPI app in main.py + routers/.
+Until the FastAPI version implements XLSX/XLS document generation
+(currently only stubs/previews exist), this file remains the only
+fully-working server. Run with:
+
+    python3 -B schoolcore_app/_legacy_server.py
+
+DO NOT add features here. New work belongs in routers/. When export
+parity is reached in FastAPI, delete this file along with
+export_template_xls.py / export_document.mjs / _vendor/.
+"""
 from __future__ import annotations
 
 import json

@@ -1,29 +1,32 @@
 # SchoolCore Local MVP
 
-This is a no-dependency local MVP prototype.
+A SQLite-backed school management prototype with two server implementations:
 
-It uses:
+- **`main.py` (FastAPI, recommended)** — modular routers under `routers/`,
+  the active development target. Currently lacks XLSX/XLS export
+  parity; previews return JSON.
+- **`_legacy_server.py` (stdlib http.server)** — original 7700-line
+  monolith, includes full document export pipeline. Frozen for
+  bug fixes only; will be deleted once FastAPI reaches parity.
 
-- Python standard library HTTP server
-- SQLite
-- Plain HTML/CSS/JavaScript frontend
-
-## Run
-
-```bash
-python3 -B schoolcore_app/server.py
-```
-
-Default URL:
-
-```text
-http://127.0.0.1:8765
-```
-
-The current development server may also be run with:
+## Run (FastAPI)
 
 ```bash
-PORT=8766 python3 -B schoolcore_app/server.py
+python3 schoolcore_app/main.py
+```
+
+Or via uvicorn:
+
+```bash
+uvicorn main:app --app-dir schoolcore_app --host 127.0.0.1 --port 8765
+```
+
+Default URL: <http://127.0.0.1:8765> · API docs: `/api/docs`
+
+## Run (legacy)
+
+```bash
+python3 -B schoolcore_app/_legacy_server.py
 ```
 
 ## Internal Trial Operations
@@ -110,8 +113,25 @@ The API returns:
 }
 ```
 
+## Migrating Existing Databases
+
+To add foreign key constraints to a database created before
+`db.py` carried `FOREIGN KEY` clauses:
+
+```bash
+python3 schoolcore_app/scripts/migrate_add_foreign_keys.py --dry-run
+python3 schoolcore_app/scripts/migrate_add_foreign_keys.py
+```
+
+The script makes a `<db>.bak.<timestamp>` copy first, rebuilds tables
+with FKs, preserves all existing rows (including dangling references,
+which are reported afterwards via `PRAGMA foreign_key_check`). The
+migration is idempotent — tables already carrying FKs are skipped.
+
 ## Reset Demo Data
 
-Stop the server, delete `schoolcore.sqlite3`, and start the server again.
+Stop the server, delete the database file, and start the server again.
+The database will be recreated with seed data on next startup.
 
-The database will be recreated with seed data.
+- FastAPI version: `data/schoolcore.db` (override via `DATA_DIR`)
+- Legacy version: `schoolcore.sqlite3` in the app directory

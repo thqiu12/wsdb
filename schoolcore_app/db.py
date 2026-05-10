@@ -57,7 +57,7 @@ def safe_serial(prefix: str = "") -> str:
 
 # ── 密码工具 ──────────────────────────────────────────────
 def hash_password(password: str) -> str:
-    """PBKDF2-HMAC-SHA256。フォーマット: salt$digest（server.py レガシー版と互換）。"""
+    """PBKDF2-HMAC-SHA256。フォーマット: salt$digest（_legacy_server.py と互換）。"""
     salt = secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac(
         "sha256", password.encode("utf-8"), salt.encode("utf-8"), PBKDF2_ITERATIONS
@@ -102,243 +102,285 @@ def write_audit(cur: sqlite3.Cursor, event_type: str, target_type: str,
 
 
 # ── 数据库初始化 ──────────────────────────────────────────
+# Schema 単一の真実源。既存 DB のマイグレーションは
+# scripts/migrate_add_foreign_keys.py が同じ定義を参照する。
+# polymorphic 参照（generated_documents.target_id, export_files.target_id）は
+# FK 不可、テンプレート系（templates.school_id 等）は seed 未投入のため未付与。
+SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY, name TEXT, email TEXT, role TEXT,
+    password_hash TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id TEXT PRIMARY KEY, actor TEXT, event_type TEXT,
+    target_type TEXT, target_id TEXT, message TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS schools (
+    id TEXT PRIMARY KEY, name TEXT, campus_name TEXT,
+    address TEXT, phone TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS courses (
+    id TEXT PRIMARY KEY, school_id TEXT, name TEXT, duration_months INTEGER,
+    tuition_amount INTEGER, active INTEGER DEFAULT 1, created_at TEXT,
+    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS admission_terms (
+    id TEXT PRIMARY KEY, school_id TEXT, name TEXT, admission_month INTEGER,
+    start_date TEXT, is_short_term INTEGER DEFAULT 0,
+    coe_default_deadline TEXT, created_at TEXT,
+    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS classes (
+    id TEXT PRIMARY KEY, school_id TEXT, name TEXT, course_id TEXT,
+    admission_term_id TEXT, created_at TEXT,
+    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE SET NULL,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL,
+    FOREIGN KEY (admission_term_id) REFERENCES admission_terms(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS persons (
+    id TEXT PRIMARY KEY, name TEXT, nationality TEXT, birth_date TEXT,
+    gender TEXT, passport_no TEXT, passport_expiry TEXT,
+    phone TEXT, email TEXT, address TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS applicants (
+    id TEXT PRIMARY KEY, application_no TEXT UNIQUE,
+    name TEXT, nationality TEXT, admission_term TEXT,
+    desired_study_length TEXT, agent_name TEXT,
+    status TEXT DEFAULT '面接申請',
+    interview_result TEXT DEFAULT '未設定',
+    application_fee_status TEXT DEFAULT '未入金',
+    created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS applicant_required_sections (
+    id TEXT PRIMARY KEY, applicant_id TEXT, section_key TEXT,
+    label TEXT, completed INTEGER DEFAULT 0, updated_at TEXT,
+    UNIQUE(applicant_id, section_key),
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS applicant_intake_forms (
+    id TEXT PRIMARY KEY, applicant_id TEXT, source_type TEXT,
+    source_label TEXT, contact_email TEXT, contact_phone TEXT,
+    payload_json TEXT, submitted_at TEXT,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS students (
+    id TEXT PRIMARY KEY, student_no TEXT, name TEXT, nationality TEXT,
+    class_name TEXT, status TEXT DEFAULT '在籍',
+    residence_card_no TEXT, residence_expiry TEXT,
+    residence_status TEXT, attendance_rate REAL DEFAULT 0,
+    phone TEXT, address_japan TEXT, passport_no TEXT,
+    birth_date TEXT, admission_date TEXT,
+    emergency_contact TEXT, notes TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS student_portal_accounts (
+    id TEXT PRIMARY KEY, student_id TEXT UNIQUE, login_id TEXT UNIQUE,
+    password_hash TEXT, password_set_at TEXT,
+    settings_json TEXT, updated_at TEXT, created_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_portal_sessions (
+    id TEXT PRIMARY KEY, student_id TEXT, session_token TEXT UNIQUE,
+    created_at TEXT, expires_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS payments (
+    id TEXT PRIMARY KEY, applicant_id TEXT, student_id TEXT,
+    payment_type TEXT, amount INTEGER, payer_type TEXT,
+    payer_display_name TEXT, status TEXT DEFAULT 'pending',
+    confirmed_at TEXT, receipt_issued INTEGER DEFAULT 0,
+    receipt_no TEXT, created_at TEXT,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE SET NULL,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS receipt_templates (
+    id TEXT PRIMARY KEY, name TEXT, campus_name TEXT,
+    file_format TEXT, status TEXT DEFAULT 'active',
+    source_path TEXT, notes TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS receipt_documents (
+    id TEXT PRIMARY KEY, payment_id TEXT, template_id TEXT,
+    receipt_no TEXT, issue_date TEXT, payer_display_name TEXT,
+    student_name TEXT, admission_term TEXT, payment_type TEXT,
+    amount INTEGER, line_note TEXT, status TEXT DEFAULT 'issued',
+    created_at TEXT,
+    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,
+    FOREIGN KEY (template_id) REFERENCES receipt_templates(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS acceptance_notice_templates (
+    id TEXT PRIMARY KEY, name TEXT, campus_name TEXT,
+    file_format TEXT, status TEXT DEFAULT 'active',
+    source_path TEXT, notes TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS withdrawal_report_templates (
+    id TEXT PRIMARY KEY, name TEXT, school_name TEXT,
+    file_format TEXT, status TEXT DEFAULT 'active',
+    source_path TEXT, notes TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS templates (
+    id TEXT PRIMARY KEY, school_id TEXT, campus_id TEXT,
+    document_type TEXT, name TEXT, format TEXT,
+    file_id TEXT, active INTEGER DEFAULT 1, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS generated_documents (
+    id TEXT PRIMARY KEY, target_type TEXT, target_id TEXT,
+    document_type TEXT, document_no TEXT, template_name TEXT,
+    status TEXT DEFAULT 'generated', created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS export_files (
+    id TEXT PRIMARY KEY, export_key TEXT UNIQUE, document_type TEXT,
+    target_id TEXT, file_path TEXT, file_url TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS coe_cases (
+    id TEXT PRIMARY KEY, applicant_id TEXT,
+    stage TEXT DEFAULT 'COE準備', deadline TEXT,
+    full_tuition_confirmed INTEGER DEFAULT 0,
+    receipt_issued INTEGER DEFAULT 0,
+    partial_coe_sent INTEGER DEFAULT 0,
+    full_coe_sent INTEGER DEFAULT 0,
+    ai_check_status TEXT DEFAULT '未実行',
+    updated_at TEXT,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS coe_materials (
+    id TEXT PRIMARY KEY, coe_case_id TEXT, material_key TEXT,
+    label TEXT, collected INTEGER DEFAULT 0,
+    checked INTEGER DEFAULT 0, updated_at TEXT,
+    UNIQUE(coe_case_id, material_key),
+    FOREIGN KEY (coe_case_id) REFERENCES coe_cases(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS ai_check_issues (
+    id TEXT PRIMARY KEY, coe_case_id TEXT, severity TEXT,
+    field TEXT, message TEXT, status TEXT DEFAULT 'open',
+    resolution_note TEXT, created_at TEXT, resolved_at TEXT,
+    FOREIGN KEY (coe_case_id) REFERENCES coe_cases(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS certificate_requests (
+    id TEXT PRIMARY KEY, student_id TEXT, certificate_type TEXT,
+    copies INTEGER DEFAULT 1, purpose TEXT, requested_by TEXT,
+    status TEXT DEFAULT '申請中', issued_by TEXT,
+    requested_at TEXT, approved_at TEXT, issued_at TEXT, created_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS attendance_rule_settings (
+    id TEXT PRIMARY KEY, school_id TEXT, late_policy TEXT,
+    early_leave_policy TEXT, official_absence_policy TEXT,
+    period_minutes INTEGER DEFAULT 45, day_summary_policy TEXT,
+    created_at TEXT,
+    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_attendance_records (
+    id TEXT PRIMARY KEY, student_id TEXT, class_date TEXT,
+    period_label TEXT, status TEXT, attendance_minutes INTEGER DEFAULT 0,
+    scheduled_minutes INTEGER DEFAULT 0, note TEXT, created_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_leave_requests (
+    id TEXT PRIMARY KEY, student_id TEXT, request_type TEXT,
+    request_date TEXT, period_label TEXT, reason TEXT,
+    detail TEXT, status TEXT DEFAULT '申請中',
+    created_at TEXT, reviewed_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_consultation_records (
+    id TEXT PRIMARY KEY, student_id TEXT, meeting_date TEXT,
+    staff_name TEXT, content TEXT, created_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_exam_results (
+    id TEXT PRIMARY KEY, student_id TEXT, exam_name TEXT,
+    score_text TEXT, certificate_no TEXT, completion_date TEXT,
+    note TEXT, created_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_grade_records (
+    id TEXT PRIMARY KEY, student_id TEXT, term_label TEXT,
+    subject_name TEXT, score REAL, grade TEXT, comment TEXT, created_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_bulletin_posts (
+    id TEXT PRIMARY KEY, title TEXT, body TEXT,
+    scope TEXT DEFAULT 'all', class_name TEXT,
+    pinned INTEGER DEFAULT 0, published_at TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS class_group_messages (
+    id TEXT PRIMARY KEY, class_name TEXT, author_name TEXT,
+    author_role TEXT, body TEXT, posted_at TEXT
+);
+CREATE TABLE IF NOT EXISTS student_homeroom_messages (
+    id TEXT PRIMARY KEY, student_id TEXT, author_name TEXT,
+    author_role TEXT, body TEXT, posted_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_homework_assignments (
+    id TEXT PRIMARY KEY, class_name TEXT, title TEXT,
+    subject_name TEXT, due_date TEXT, description TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS student_homework_submissions (
+    id TEXT PRIMARY KEY, assignment_id TEXT, student_id TEXT,
+    file_name TEXT, file_path TEXT, note TEXT,
+    status TEXT DEFAULT '提出済', review_comment TEXT,
+    review_score INTEGER, reviewed_by TEXT,
+    reviewed_at TEXT, submitted_at TEXT,
+    FOREIGN KEY (assignment_id) REFERENCES student_homework_assignments(id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS immigration_report_batches (
+    id TEXT PRIMARY KEY, report_type TEXT, school_id TEXT,
+    status TEXT DEFAULT 'draft', due_date TEXT,
+    submitted_at TEXT, submission_method TEXT,
+    receipt_number TEXT, evidence_file_id TEXT, created_at TEXT,
+    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS immigration_report_items (
+    id TEXT PRIMARY KEY, batch_id TEXT, student_id TEXT,
+    include INTEGER DEFAULT 1, note TEXT, created_at TEXT,
+    FOREIGN KEY (batch_id) REFERENCES immigration_report_batches(id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS import_batches (
+    id TEXT PRIMARY KEY, filename TEXT, status TEXT,
+    total_rows INTEGER DEFAULT 0, imported_rows INTEGER DEFAULT 0,
+    error_rows INTEGER DEFAULT 0, source_label TEXT,
+    note TEXT, stored_path TEXT, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS import_batch_items (
+    id TEXT PRIMARY KEY, batch_id TEXT, row_no INTEGER,
+    status TEXT, applicant_id TEXT, message TEXT,
+    raw_json TEXT, created_at TEXT,
+    FOREIGN KEY (batch_id) REFERENCES import_batches(id) ON DELETE CASCADE,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS annual_completion_results (
+    id TEXT PRIMARY KEY, student_id TEXT, requirement TEXT,
+    destination TEXT, certificate_no TEXT, completion_date TEXT,
+    is_qualifying INTEGER DEFAULT 1, is_withdrawal INTEGER DEFAULT 0,
+    category TEXT, display_name TEXT, score_text TEXT,
+    note TEXT, created_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_advancement_results (
+    id TEXT PRIMARY KEY, student_id TEXT, school_name TEXT,
+    department_name TEXT, completion_date TEXT, note TEXT, created_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_employment_results (
+    id TEXT PRIMARY KEY, student_id TEXT, company_name TEXT,
+    job_title TEXT, completion_date TEXT, note TEXT, created_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS student_withdrawal_outcomes (
+    id TEXT PRIMARY KEY, student_id TEXT, outcome_type TEXT,
+    destination TEXT, certificate_no TEXT, completion_date TEXT,
+    score_text TEXT, note TEXT, category TEXT, created_at TEXT,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+"""
+
+
 def init_db() -> None:
     """初始化数据库表结构（保持与原版完全兼容）"""
     conn = connect()
-    conn.executescript("""
-    CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY, name TEXT, email TEXT, role TEXT,
-        password_hash TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS audit_logs (
-        id TEXT PRIMARY KEY, actor TEXT, event_type TEXT,
-        target_type TEXT, target_id TEXT, message TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS schools (
-        id TEXT PRIMARY KEY, name TEXT, campus_name TEXT,
-        address TEXT, phone TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS courses (
-        id TEXT PRIMARY KEY, school_id TEXT, name TEXT, duration_months INTEGER,
-        tuition_amount INTEGER, active INTEGER DEFAULT 1, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS admission_terms (
-        id TEXT PRIMARY KEY, school_id TEXT, name TEXT, admission_month INTEGER,
-        start_date TEXT, is_short_term INTEGER DEFAULT 0,
-        coe_default_deadline TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS classes (
-        id TEXT PRIMARY KEY, school_id TEXT, name TEXT, course_id TEXT,
-        admission_term_id TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS persons (
-        id TEXT PRIMARY KEY, name TEXT, nationality TEXT, birth_date TEXT,
-        gender TEXT, passport_no TEXT, passport_expiry TEXT,
-        phone TEXT, email TEXT, address TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS applicants (
-        id TEXT PRIMARY KEY, application_no TEXT UNIQUE,
-        name TEXT, nationality TEXT, admission_term TEXT,
-        desired_study_length TEXT, agent_name TEXT,
-        status TEXT DEFAULT '面接申請',
-        interview_result TEXT DEFAULT '未設定',
-        application_fee_status TEXT DEFAULT '未入金',
-        created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS applicant_required_sections (
-        id TEXT PRIMARY KEY, applicant_id TEXT, section_key TEXT,
-        label TEXT, completed INTEGER DEFAULT 0, updated_at TEXT,
-        UNIQUE(applicant_id, section_key)
-    );
-    CREATE TABLE IF NOT EXISTS applicant_intake_forms (
-        id TEXT PRIMARY KEY, applicant_id TEXT, source_type TEXT,
-        source_label TEXT, contact_email TEXT, contact_phone TEXT,
-        payload_json TEXT, submitted_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS students (
-        id TEXT PRIMARY KEY, student_no TEXT, name TEXT, nationality TEXT,
-        class_name TEXT, status TEXT DEFAULT '在籍',
-        residence_card_no TEXT, residence_expiry TEXT,
-        residence_status TEXT, attendance_rate REAL DEFAULT 0,
-        phone TEXT, address_japan TEXT, passport_no TEXT,
-        birth_date TEXT, admission_date TEXT,
-        emergency_contact TEXT, notes TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_portal_accounts (
-        id TEXT PRIMARY KEY, student_id TEXT UNIQUE, login_id TEXT UNIQUE,
-        password_hash TEXT, password_set_at TEXT,
-        settings_json TEXT, updated_at TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_portal_sessions (
-        id TEXT PRIMARY KEY, student_id TEXT, session_token TEXT UNIQUE,
-        created_at TEXT, expires_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS payments (
-        id TEXT PRIMARY KEY, applicant_id TEXT, student_id TEXT,
-        payment_type TEXT, amount INTEGER, payer_type TEXT,
-        payer_display_name TEXT, status TEXT DEFAULT 'pending',
-        confirmed_at TEXT, receipt_issued INTEGER DEFAULT 0,
-        receipt_no TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS receipt_templates (
-        id TEXT PRIMARY KEY, name TEXT, campus_name TEXT,
-        file_format TEXT, status TEXT DEFAULT 'active',
-        source_path TEXT, notes TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS receipt_documents (
-        id TEXT PRIMARY KEY, payment_id TEXT, template_id TEXT,
-        receipt_no TEXT, issue_date TEXT, payer_display_name TEXT,
-        student_name TEXT, admission_term TEXT, payment_type TEXT,
-        amount INTEGER, line_note TEXT, status TEXT DEFAULT 'issued',
-        created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS acceptance_notice_templates (
-        id TEXT PRIMARY KEY, name TEXT, campus_name TEXT,
-        file_format TEXT, status TEXT DEFAULT 'active',
-        source_path TEXT, notes TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS withdrawal_report_templates (
-        id TEXT PRIMARY KEY, name TEXT, school_name TEXT,
-        file_format TEXT, status TEXT DEFAULT 'active',
-        source_path TEXT, notes TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS templates (
-        id TEXT PRIMARY KEY, school_id TEXT, campus_id TEXT,
-        document_type TEXT, name TEXT, format TEXT,
-        file_id TEXT, active INTEGER DEFAULT 1, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS generated_documents (
-        id TEXT PRIMARY KEY, target_type TEXT, target_id TEXT,
-        document_type TEXT, document_no TEXT, template_name TEXT,
-        status TEXT DEFAULT 'generated', created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS export_files (
-        id TEXT PRIMARY KEY, export_key TEXT UNIQUE, document_type TEXT,
-        target_id TEXT, file_path TEXT, file_url TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS coe_cases (
-        id TEXT PRIMARY KEY, applicant_id TEXT,
-        stage TEXT DEFAULT 'COE準備', deadline TEXT,
-        full_tuition_confirmed INTEGER DEFAULT 0,
-        receipt_issued INTEGER DEFAULT 0,
-        partial_coe_sent INTEGER DEFAULT 0,
-        full_coe_sent INTEGER DEFAULT 0,
-        ai_check_status TEXT DEFAULT '未実行',
-        updated_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS coe_materials (
-        id TEXT PRIMARY KEY, coe_case_id TEXT, material_key TEXT,
-        label TEXT, collected INTEGER DEFAULT 0,
-        checked INTEGER DEFAULT 0, updated_at TEXT,
-        UNIQUE(coe_case_id, material_key)
-    );
-    CREATE TABLE IF NOT EXISTS ai_check_issues (
-        id TEXT PRIMARY KEY, coe_case_id TEXT, severity TEXT,
-        field TEXT, message TEXT, status TEXT DEFAULT 'open',
-        resolution_note TEXT, created_at TEXT, resolved_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS certificate_requests (
-        id TEXT PRIMARY KEY, student_id TEXT, certificate_type TEXT,
-        copies INTEGER DEFAULT 1, purpose TEXT, requested_by TEXT,
-        status TEXT DEFAULT '申請中', issued_by TEXT,
-        requested_at TEXT, approved_at TEXT, issued_at TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS attendance_rule_settings (
-        id TEXT PRIMARY KEY, school_id TEXT, late_policy TEXT,
-        early_leave_policy TEXT, official_absence_policy TEXT,
-        period_minutes INTEGER DEFAULT 45, day_summary_policy TEXT,
-        created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_attendance_records (
-        id TEXT PRIMARY KEY, student_id TEXT, class_date TEXT,
-        period_label TEXT, status TEXT, attendance_minutes INTEGER DEFAULT 0,
-        scheduled_minutes INTEGER DEFAULT 0, note TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_leave_requests (
-        id TEXT PRIMARY KEY, student_id TEXT, request_type TEXT,
-        request_date TEXT, period_label TEXT, reason TEXT,
-        detail TEXT, status TEXT DEFAULT '申請中',
-        created_at TEXT, reviewed_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_consultation_records (
-        id TEXT PRIMARY KEY, student_id TEXT, meeting_date TEXT,
-        staff_name TEXT, content TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_exam_results (
-        id TEXT PRIMARY KEY, student_id TEXT, exam_name TEXT,
-        score_text TEXT, certificate_no TEXT, completion_date TEXT,
-        note TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_grade_records (
-        id TEXT PRIMARY KEY, student_id TEXT, term_label TEXT,
-        subject_name TEXT, score REAL, grade TEXT, comment TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_bulletin_posts (
-        id TEXT PRIMARY KEY, title TEXT, body TEXT,
-        scope TEXT DEFAULT 'all', class_name TEXT,
-        pinned INTEGER DEFAULT 0, published_at TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS class_group_messages (
-        id TEXT PRIMARY KEY, class_name TEXT, author_name TEXT,
-        author_role TEXT, body TEXT, posted_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_homeroom_messages (
-        id TEXT PRIMARY KEY, student_id TEXT, author_name TEXT,
-        author_role TEXT, body TEXT, posted_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_homework_assignments (
-        id TEXT PRIMARY KEY, class_name TEXT, title TEXT,
-        subject_name TEXT, due_date TEXT, description TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_homework_submissions (
-        id TEXT PRIMARY KEY, assignment_id TEXT, student_id TEXT,
-        file_name TEXT, file_path TEXT, note TEXT,
-        status TEXT DEFAULT '提出済', review_comment TEXT,
-        review_score INTEGER, reviewed_by TEXT,
-        reviewed_at TEXT, submitted_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS immigration_report_batches (
-        id TEXT PRIMARY KEY, report_type TEXT, school_id TEXT,
-        status TEXT DEFAULT 'draft', due_date TEXT,
-        submitted_at TEXT, submission_method TEXT,
-        receipt_number TEXT, evidence_file_id TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS immigration_report_items (
-        id TEXT PRIMARY KEY, batch_id TEXT, student_id TEXT,
-        include INTEGER DEFAULT 1, note TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS import_batches (
-        id TEXT PRIMARY KEY, filename TEXT, status TEXT,
-        total_rows INTEGER DEFAULT 0, imported_rows INTEGER DEFAULT 0,
-        error_rows INTEGER DEFAULT 0, source_label TEXT,
-        note TEXT, stored_path TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS import_batch_items (
-        id TEXT PRIMARY KEY, batch_id TEXT, row_no INTEGER,
-        status TEXT, applicant_id TEXT, message TEXT,
-        raw_json TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS annual_completion_results (
-        id TEXT PRIMARY KEY, student_id TEXT, requirement TEXT,
-        destination TEXT, certificate_no TEXT, completion_date TEXT,
-        is_qualifying INTEGER DEFAULT 1, is_withdrawal INTEGER DEFAULT 0,
-        category TEXT, display_name TEXT, score_text TEXT,
-        note TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_advancement_results (
-        id TEXT PRIMARY KEY, student_id TEXT, school_name TEXT,
-        department_name TEXT, completion_date TEXT, note TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_employment_results (
-        id TEXT PRIMARY KEY, student_id TEXT, company_name TEXT,
-        job_title TEXT, completion_date TEXT, note TEXT, created_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS student_withdrawal_outcomes (
-        id TEXT PRIMARY KEY, student_id TEXT, outcome_type TEXT,
-        destination TEXT, certificate_no TEXT, completion_date TEXT,
-        score_text TEXT, note TEXT, category TEXT, created_at TEXT
-    );
-    """)
+    conn.executescript(SCHEMA_SQL)
     conn.commit()
     _seed_demo_data(conn)
 
