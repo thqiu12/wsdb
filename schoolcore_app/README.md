@@ -30,13 +30,23 @@ PORT=8766 python3 -B schoolcore_app/server.py
 
 ### Admin Login
 
-The admin UI now requires a staff account login.
+The admin UI requires a staff account login.
 
-Internal trial seed accounts:
+Seed accounts (`staff`, `immigration_report_staff`, `manager`) are created
+on first run from environment variables. **Do not commit real credentials
+to this repository.** Set the following before starting the server:
 
-- `yamada` / `Yamada2026!` (`staff`)
-- `nakajima` / `Nakajima2026!` (`immigration_report_staff`)
-- `admin` / `Admin2026!` (`manager`)
+```bash
+export SCHOOLCORE_SEED_STAFF_LOGIN=...
+export SCHOOLCORE_SEED_STAFF_PASSWORD=...
+export SCHOOLCORE_SEED_IMMIGRATION_LOGIN=...
+export SCHOOLCORE_SEED_IMMIGRATION_PASSWORD=...
+export SCHOOLCORE_SEED_MANAGER_LOGIN=...
+export SCHOOLCORE_SEED_MANAGER_PASSWORD=...
+```
+
+If the seed script falls back to defaults, change every password
+immediately after the first login.
 
 ### Daily Backup
 
@@ -60,16 +70,15 @@ Run a quick API-level smoke check before internal trial use:
 python3 schoolcore_app/scripts/internal_trial_smoke_check.py
 ```
 
-By default, the smoke check logs in with:
-
-- `SCHOOLCORE_STAFF_LOGIN=yamada`
-- `SCHOOLCORE_STAFF_PASSWORD=Yamada2026!`
+Login is configured via the same `SCHOOLCORE_STAFF_LOGIN` /
+`SCHOOLCORE_STAFF_PASSWORD` environment variables — no defaults are
+shipped in this repository.
 
 Optional student portal login verification:
 
 ```bash
-SCHOOLCORE_STUDENT_LOGIN=202604203 \
-SCHOOLCORE_STUDENT_PASSWORD='Lin2030!' \
+SCHOOLCORE_STUDENT_LOGIN=... \
+SCHOOLCORE_STUDENT_PASSWORD=... \
 python3 schoolcore_app/scripts/internal_trial_smoke_check.py
 ```
 

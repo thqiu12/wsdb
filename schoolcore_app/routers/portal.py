@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -9,18 +9,24 @@ from db import row, rows, connect, now_iso, new_id, write_audit, hash_password, 
 
 router = APIRouter()
 
+SESSION_TTL = timedelta(hours=24)
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
 
 def _issue_session(student_id: str) -> str:
     conn = connect()
     cur = conn.cursor()
     cur.execute("DELETE FROM student_portal_sessions WHERE student_id=?", (student_id,))
     token = secrets.token_urlsafe(32)
-    now = datetime.now()
-    expires = now.replace(hour=23, minute=59, second=59).isoformat()
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    expires = (now + SESSION_TTL).isoformat()
     cur.execute("""
         INSERT INTO student_portal_sessions (id, student_id, session_token, created_at, expires_at)
         VALUES (?,?,?,?,?)
-    """, (new_id(), student_id, token, now.replace(microsecond=0).isoformat(), expires))
+    """, (new_id(), student_id, token, now.isoformat(), expires))
     conn.commit()
     return token
 
@@ -28,11 +34,12 @@ def _issue_session(student_id: str) -> str:
 def _student_by_token(token: str) -> dict | None:
     if not token:
         return None
+    # INNER JOIN で students が存在しない孤立 session を弾く。
     return row("""
         SELECT s.* FROM student_portal_sessions sp
-        LEFT JOIN students s ON s.id = sp.student_id
+        JOIN students s ON s.id = sp.student_id
         WHERE sp.session_token=? AND sp.expires_at >= ?
-    """, (token, now_iso()))
+    """, (token, _utc_now_iso()))
 
 
 def _build_portal_payload(student: dict) -> dict:
@@ -119,10 +126,12 @@ class StudentLogin(BaseModel):
 
 @router.post("/student-login")
 async def student_login(body: StudentLogin):
+    # 明示的に列を選ぶことで spa.id と s.id の上書き衝突を回避し、
+    # students 行が欠けている孤立アカウントを INNER JOIN で弾く。
     account = row("""
-        SELECT spa.*, s.*
+        SELECT spa.id AS account_id, spa.student_id, spa.login_id, spa.password_hash
         FROM student_portal_accounts spa
-        LEFT JOIN students s ON s.id = spa.student_id
+        JOIN students s ON s.id = spa.student_id
         WHERE spa.login_id=?
     """, (body.login_id.strip(),))
     if not account:
@@ -135,6 +144,9 @@ async def student_login(body: StudentLogin):
         raise HTTPException(401, detail={"error": {"code": "AUTH_FAILED",
                                                     "message": "学生番号またはパスワードが正しくありません。"}})
     student = row("SELECT * FROM students WHERE id=?", (account["student_id"],))
+    if not student:
+        raise HTTPException(404, detail={"error": {"code": "NOT_FOUND",
+                                                    "message": "学生情報が見つかりません。"}})
     session_token = _issue_session(student["id"])
     payload = _build_portal_payload(student)
     payload["session_token"] = session_token

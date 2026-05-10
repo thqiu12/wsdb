@@ -1,5 +1,7 @@
 // ── SchoolCore V2 Frontend ─────────────────────────────────────────────────
-const API_TOKEN = 'schoolcore-dev-token';
+// API token はログイン後にサーバーから払い出された値を localStorage('apiToken') に
+// 保存しておくこと。空のままだと SCHOOLCORE_DEV_MODE=1 起動時のみ動作する。
+const API_TOKEN = (typeof localStorage !== 'undefined' && localStorage.getItem('apiToken')) || '';
 const BASE = '';
 
 // ── API Helper ────────────────────────────────────────────────────────────

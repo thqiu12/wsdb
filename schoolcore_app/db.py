@@ -1,5 +1,6 @@
 """SchoolCore 数据库模块 - 线程安全连接 + 工具函数"""
 from __future__ import annotations
+import os
 import sqlite3
 import threading
 import uuid
@@ -7,6 +8,10 @@ import secrets
 import hashlib
 from datetime import datetime
 from config import DB_PATH
+
+# PBKDF2 反復回数。OWASP 2023+ 推奨 600k だが、SQLite ローカル運用での
+# 体感を加味し既定 200k。本番では SCHOOLCORE_PBKDF2_ITER で調整可。
+PBKDF2_ITERATIONS = int(os.environ.get("SCHOOLCORE_PBKDF2_ITER", "200000"))
 
 # ── 线程本地连接 ──────────────────────────────────────────
 _local = threading.local()
@@ -44,26 +49,45 @@ def new_id() -> str:
 
 
 def safe_serial(prefix: str = "") -> str:
-    """生成带日期前缀的唯一序列号，使用 5 位随机数降低碰撞概率"""
+    """日付プレフィックス付き一意系列番号。8 桁 hex（32bit）で衝突確率を最小化。"""
     today = datetime.now().strftime("%Y%m%d")
-    suffix = str(secrets.randbelow(99999)).zfill(5)
+    suffix = secrets.token_hex(4).upper()
     return f"{prefix}{today}-{suffix}" if prefix else f"{today}-{suffix}"
 
 
 # ── 密码工具 ──────────────────────────────────────────────
 def hash_password(password: str) -> str:
-    """使用 SHA-256 + 随机 salt 哈希密码"""
+    """PBKDF2-HMAC-SHA256。フォーマット: salt$digest（server.py レガシー版と互換）。"""
     salt = secrets.token_hex(16)
-    digest = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
-    return f"{salt}:{digest}"
+    digest = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), PBKDF2_ITERATIONS
+    ).hex()
+    return f"{salt}${digest}"
 
 
 def verify_password(password: str, stored: str) -> bool:
-    try:
-        salt, digest = stored.split(":", 1)
-        return hashlib.sha256(f"{salt}{password}".encode()).hexdigest() == digest
-    except Exception:
+    if not stored:
         return False
+    # 新フォーマット: salt$digest (PBKDF2-HMAC-SHA256)
+    if "$" in stored:
+        try:
+            salt, digest = stored.split("$", 1)
+            calc = hashlib.pbkdf2_hmac(
+                "sha256", password.encode("utf-8"), salt.encode("utf-8"), PBKDF2_ITERATIONS
+            ).hex()
+            return secrets.compare_digest(calc, digest)
+        except Exception:
+            return False
+    # 旧フォーマット: salt:digest (SHA-256 単一ラウンド)。
+    # 既存アカウント救済用のマイグレーションパスのみ。新規は salt$digest を発行する。
+    if ":" in stored:
+        try:
+            salt, digest = stored.split(":", 1)
+            calc = hashlib.sha256(f"{salt}{password}".encode("utf-8")).hexdigest()
+            return secrets.compare_digest(calc, digest)
+        except Exception:
+            return False
+    return False
 
 
 # ── 审计日志 ──────────────────────────────────────────────

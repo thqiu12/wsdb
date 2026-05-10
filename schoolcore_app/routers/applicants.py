@@ -97,7 +97,8 @@ async def create_applicant(body: ApplicantCreate, auth=Depends(require_auth)):
     cur = conn.cursor()
     applicant_id = new_id()
     today = datetime.now().strftime("%Y%m")
-    application_no = f"APP-{today}-{str(secrets.randbelow(99999)).zfill(5)}"
+    # 8 桁 hex（32bit）で衝突確率を最小化。日次 100k 件規模でも安全。
+    application_no = f"APP-{today}-{secrets.token_hex(4).upper()}"
     cur.execute("""
         INSERT INTO applicants
         (id, application_no, name, nationality, admission_term, desired_study_length,

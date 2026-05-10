@@ -11,17 +11,27 @@ from config import STATIC_DIR, EXPORT_DIR, PORT
 from db import init_db
 
 
+def _allowed_origins() -> list[str]:
+    raw = os.environ.get("SCHOOLCORE_CORS_ORIGINS", "")
+    if raw:
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return [f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"]
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="SchoolCore API", version="2.0.0", docs_url="/api/docs")
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
+        allow_origins=_allowed_origins(),
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "x-staff-session"],
     )
+
+    @app.on_event("startup")
+    async def _startup() -> None:
+        init_db()
 
     # ── 导入并注册路由 ─────────────────────────────────────
     from routers import (
@@ -42,7 +52,9 @@ def create_app() -> FastAPI:
 
     # ── 静态文件 ──────────────────────────────────────────
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-    app.mount("/exports", StaticFiles(directory=str(EXPORT_DIR)), name="exports")
+    # NOTE: /exports をディレクトリごと mount するとファイル名さえ知っていれば
+    # 誰でもダウンロード可能になる。エクスポート生成エンドポイントを実装する際に、
+    # export_files.access_token を検証するガード付きエンドポイントを追加すること。
 
     # ── 页面路由 ──────────────────────────────────────────
     @app.get("/", include_in_schema=False)
@@ -70,7 +82,6 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    init_db()
     print(f"SchoolCore V2 starting on http://127.0.0.1:{PORT}")
     print(f"API Docs: http://127.0.0.1:{PORT}/api/docs")
     uvicorn.run("main:app", host="127.0.0.1", port=PORT, reload=False)
