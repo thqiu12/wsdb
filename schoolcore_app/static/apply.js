@@ -1,3 +1,15 @@
+// HTML エスケープ。innerHTML に流す全てのユーザー由来文字列でこれを通す。
+function escapeHtml(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+
 async function submitPortalForm(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -17,7 +29,7 @@ async function submitPortalForm(event) {
   success.classList.remove("hidden");
   success.innerHTML = `
     <h2>申込みを受け付けました。</h2>
-    <p>受付番号は <strong>${data.application_no}</strong> です。事務局からの連絡をお待ちください。</p>
+    <p>受付番号は <strong>${escapeHtml(data.application_no)}</strong> です。事務局からの連絡をお待ちください。</p>
   `;
 }
 
