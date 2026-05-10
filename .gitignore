@@ -10,3 +10,11 @@ data/
 schoolcore_app/data/
 *.bak
 .env
+.env.*
+schoolcore_app/schoolcore.sqlite3
+schoolcore_app/exports/
+schoolcore_app/uploads/
+schoolcore_app/backups/
+schoolcore_app/operations_status.json
+node_modules/
+.Rhistory

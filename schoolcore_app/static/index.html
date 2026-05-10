@@ -3,396 +3,78 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SchoolCore</title>
-  <link rel="stylesheet" href="/static/fontawesome.min.css">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; height: 100%; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif; background: #f8fafc; color: #1e293b; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-
-    /* Layout */
-    .app-shell { display: flex; height: 100vh; overflow: hidden; }
-    .sidebar { width: 224px; flex-shrink: 0; display: flex; flex-direction: column; overflow-y: auto; background: #0f172a; }
-    .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-    .topbar { background: white; border-bottom: 1px solid #e2e8f0; padding: 0 28px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; flex-shrink: 0; }
-    .page-content { flex: 1; overflow-y: auto; padding: 24px; }
-
-    /* Sidebar */
-    .brand { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 10px; }
-    .brand-icon { width: 32px; height: 32px; border-radius: 8px; background: #2563eb; display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; flex-shrink: 0; }
-    .brand-name { color: white; font-weight: 700; font-size: 14px; line-height: 1.2; }
-    .brand-sub  { color: #94a3b8; font-size: 11px; }
-    .nav-section { font-size: 10px; font-weight: 700; color: #475569; letter-spacing: 0.08em; padding: 12px 16px 4px; text-transform: uppercase; }
-    .sidebar-nav { flex: 1; padding: 8px; padding-top: 12px; }
-    .sidebar-nav a { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 8px; color: #94a3b8; text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.15s; cursor: pointer; margin-bottom: 1px; }
-    .sidebar-nav a:hover { background: #1e293b; color: #e2e8f0; }
-    .sidebar-nav a.active { background: #1e40af; color: #fff; }
-    .sidebar-nav a .nav-icon { width: 18px; text-align: center; font-size: 13px; flex-shrink: 0; }
-    .user-footer { padding: 12px; border-top: 1px solid rgba(255,255,255,0.1); }
-    .user-card { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
-    .user-card:hover { background: rgba(255,255,255,0.05); }
-    .user-avatar { width: 28px; height: 28px; border-radius: 50%; background: #3b82f6; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: 700; flex-shrink: 0; }
-    .user-name { color: #e2e8f0; font-size: 12px; font-weight: 600; }
-    .user-role { color: #94a3b8; font-size: 11px; }
-
-    /* Topbar */
-    .page-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0; }
-    .page-subtitle { font-size: 12px; color: #94a3b8; margin: 2px 0 0; }
-    .topbar-right { display: flex; align-items: center; gap: 8px; }
-    .divider-v { width: 1px; height: 20px; background: #e2e8f0; }
-
-    /* Views */
-    .view { display: none; }
-    .view.active { display: block; }
-
-    /* Cards */
-    .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; }
-    .stat-card { background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; transition: box-shadow 0.15s; overflow: hidden; }
-    .stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-    .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
-    .grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
-    .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
-
-    /* Badges */
-    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-    .badge-blue   { background:#dbeafe; color:#1d4ed8; }
-    .badge-green  { background:#dcfce7; color:#15803d; }
-    .badge-yellow { background:#fef9c3; color:#a16207; }
-    .badge-red    { background:#fee2e2; color:#b91c1c; }
-    .badge-gray   { background:#f1f5f9; color:#475569; }
-    .badge-purple { background:#f3e8ff; color:#7e22ce; }
-    .badge-orange { background:#ffedd5; color:#c2410c; }
-
-    /* Table */
-    .table-wrap { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
-    .data-table { width: 100%; border-collapse: collapse; }
-    .data-table th { background: #f8fafc; text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
-    .data-table td { padding: 12px 14px; font-size: 13px; color: #334155; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-    .data-table tr:last-child td { border-bottom: none; }
-    .data-table tr:hover td { background: #f8fafc; }
-
-    /* Buttons */
-    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: none; outline: none; text-decoration: none; }
-    .btn-primary   { background: #2563eb; color: white; }
-    .btn-primary:hover { background: #1d4ed8; }
-    .btn-secondary { background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
-    .btn-secondary:hover { background: #e2e8f0; }
-    .btn-ghost     { background: transparent; color: #64748b; }
-    .btn-ghost:hover { background: #f1f5f9; color: #334155; }
-    .btn-danger    { background: #fee2e2; color: #b91c1c; }
-    .btn-danger:hover { background: #fecaca; }
-    .btn-success   { background: #dcfce7; color: #15803d; }
-    .btn-success:hover { background: #bbf7d0; }
-    .btn-sm { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    /* Form */
-    .input { width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #1e293b; outline: none; transition: border-color 0.15s; }
-    .input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
-    select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
-    .label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; display: block; }
-    .form-group { margin-bottom: 16px; }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-    /* Section header */
-    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .section-title { font-size: 15px; font-weight: 700; color: #0f172a; }
-
-    /* Toast */
-    .toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-    .toast-item { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); font-size: 13px; font-weight: 500; pointer-events: all; animation: slideIn 0.2s ease; min-width: 260px; }
-    .toast-item.success { background: #1e293b; color: #fff; }
-    .toast-item.error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-    .toast-item.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
-    .toast-item.info    { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-    @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-    /* Drawer */
-    .drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1000; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
-    .drawer-backdrop.open { opacity: 1; pointer-events: all; }
-    .drawer { position: fixed; top: 0; right: -640px; width: 640px; height: 100%; background: white; z-index: 1001; overflow-y: auto; transition: right 0.25s cubic-bezier(0.4,0,0.2,1); box-shadow: -4px 0 32px rgba(0,0,0,0.12); }
-    .drawer.open { right: 0; }
-    .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; background: white; z-index: 10; }
-    .drawer-body { padding: 24px; }
-    .drawer-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0; }
-
-    /* Modal */
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 2000; display: flex; align-items: center; justify-content: center; }
-    .modal { background: white; border-radius: 14px; padding: 28px; min-width: 400px; max-width: 560px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: modalIn 0.15s ease; }
-    @keyframes modalIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    .modal-title { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 20px; }
-    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
-
-    /* Misc */
-    .progress-bar { height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
-    .progress-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
-    .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px; }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    .text-red-500 { color: #ef4444; }
-    .text-sm { font-size: 13px; }
-    .text-xs { font-size: 11px; }
-    .text-slate-400 { color: #94a3b8; }
-    .text-slate-500 { color: #64748b; }
-    .text-slate-600 { color: #475569; }
-    .text-slate-800 { color: #1e293b; }
-    .text-center { text-align: center; }
-    .font-bold { font-weight: 700; }
-    .font-semibold { font-weight: 600; }
-    .py-10 { padding-top: 40px; padding-bottom: 40px; }
-    .mt-1 { margin-top: 4px; }
-    .mt-2 { margin-top: 8px; }
-    .mt-4 { margin-top: 16px; }
-    .mb-4 { margin-bottom: 16px; }
-    .mb-6 { margin-bottom: 24px; }
-    .gap-2 { gap: 8px; }
-    .flex { display: flex; }
-    .flex-wrap { flex-wrap: wrap; }
-    .items-center { align-items: center; }
-    .justify-between { justify-content: space-between; }
-    .w-full { width: 100%; }
-    .inline-flex { display: inline-flex; }
-    .rounded-full { border-radius: 999px; }
-    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tabs { display: flex; gap: 2px; background: #f1f5f9; border-radius: 10px; padding: 4px; margin-bottom: 20px; }
-    .tab { padding: 6px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; color: #64748b; cursor: pointer; transition: all 0.15s; border: none; background: none; }
-    .tab.active { background: white; color: #1e293b; box-shadow: 0 1px 4px rgba(0,0,0,0.1); font-weight: 600; }
-    .search-bar { display: flex; gap: 8px; margin-bottom: 16px; }
-    .search-bar .input { max-width: 280px; }
-    .stat-num { font-size: 28px; font-weight: 800; line-height: 1; margin: 8px 0 4px; }
-    .stat-label { font-size: 12px; color: #64748b; }
-    .stat-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-    .stat-row { display: flex; align-items: flex-start; justify-content: space-between; }
-    .stat-card p { margin: 0; }
-    .stat-card .text-xs.uppercase { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .stat-card .text-3xl { font-size: 28px; font-weight: 800; margin: 6px 0 4px; line-height: 1; }
-    .stat-card .text-xs.text-slate-400 { font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .flag { display: inline-flex; align-items: center; justify-content: center; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; background: #f1f5f9; color: #475569; margin-right: 4px; }
-    .alert-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; }
-    .alert-item.red    { background: #fef2f2; border-left: 3px solid #ef4444; }
-    .alert-item.yellow { background: #fefce8; border-left: 3px solid #eab308; }
-
-    /* ── Tailwind utility replacements ── */
-    .grid { display: grid; }
-    .grid-cols-2 { grid-template-columns: repeat(2,1fr); }
-    .grid-cols-3 { grid-template-columns: repeat(3,1fr); }
-    .grid-cols-4 { grid-template-columns: repeat(4,1fr); }
-    /* stat cards: force 4 columns on wide screens */
-    @media (min-width: 900px) { .grid-cols-4 { grid-template-columns: repeat(4,1fr); } }
-    @media (max-width: 899px) { .grid-cols-4 { grid-template-columns: repeat(2,1fr); } }
-    .col-span-2 { grid-column: span 2; }
-    .gap-1   { gap: 4px; }  .gap-1\.5 { gap: 6px; }
-    .gap-2   { gap: 8px; }  .gap-2\.5 { gap: 10px; }
-    .gap-3   { gap: 12px; } .gap-4    { gap: 16px; }
-    .gap-5   { gap: 20px; }
-    .flex { display: flex; } .inline-flex { display: inline-flex; }
-    .flex-1 { flex: 1; } .flex-col { flex-direction: column; }
-    .flex-wrap { flex-wrap: wrap; } .flex-shrink-0 { flex-shrink: 0; }
-    .items-center { align-items: center; } .items-start { align-items: flex-start; }
-    .justify-between { justify-content: space-between; }
-    .justify-center  { justify-content: center; }
-    .justify-end     { justify-content: flex-end; }
-    .self-center { align-self: center; }
-    .ml-auto { margin-left: auto; } .ml-4 { margin-left: 16px; }
-    .mr-1 { margin-right: 4px; } .mr-1\.5 { margin-right: 6px; }
-    .mx-1 { margin-left: 4px; margin-right: 4px; }
-    .mt-0\.5 { margin-top: 2px; } .mt-1 { margin-top: 4px; } .mt-2 { margin-top: 8px; }
-    .mt-3 { margin-top: 12px; } .mt-4 { margin-top: 16px; } .mt-5 { margin-top: 20px; }
-    .mb-1 { margin-bottom: 4px; } .mb-1\.5 { margin-bottom: 6px; } .mb-2 { margin-bottom: 8px; }
-    .mb-3 { margin-bottom: 12px; } .mb-4 { margin-bottom: 16px; } .mb-5 { margin-bottom: 20px; }
-    .mb-6 { margin-bottom: 24px; } .pb-0 { padding-bottom: 0; } .pb-3 { padding-bottom: 12px; }
-    .pt-3 { padding-top: 12px; } .pt-4 { padding-top: 16px; }
-    .p-2 { padding: 8px; } .p-2\.5 { padding: 10px; } .p-3 { padding: 12px; }
-    .px-1 { padding-left: 4px; padding-right: 4px; }
-    .px-4 { padding-left: 16px; padding-right: 16px; }
-    .py-1\.5 { padding-top: 6px; padding-bottom: 6px; }
-    .py-2 { padding-top: 8px; padding-bottom: 8px; }
-    .py-2\.5 { padding-top: 10px; padding-bottom: 10px; }
-    .py-4 { padding-top: 16px; padding-bottom: 16px; }
-    .py-6 { padding-top: 24px; padding-bottom: 24px; }
-    .py-10 { padding-top: 40px; padding-bottom: 40px; }
-    .py-16 { padding-top: 64px; padding-bottom: 64px; }
-    .w-4  { width: 16px; } .w-7  { width: 28px; } .w-10 { width: 40px; }
-    .w-12 { width: 48px; } .w-full { width: 100%; }
-    .h-4  { height: 16px; } .h-7  { height: 28px; } .h-8  { height: 32px; }
-    .h-10 { height: 40px; } .h-12 { height: 48px; }
-    .min-w-0 { min-width: 0; }
-    .max-w-xs { max-width: 320px; } .max-w-\[120px\] { max-width: 120px; }
-    .text-xs   { font-size: 11px; line-height: 1.4; }
-    .text-sm   { font-size: 13px; line-height: 1.5; }
-    .text-base { font-size: 14px; line-height: 1.5; }
-    .text-xl   { font-size: 20px; line-height: 1.3; }
-    .text-3xl  { font-size: 30px; line-height: 1.2; }
-    .text-4xl  { font-size: 36px; line-height: 1.1; }
-    .font-medium   { font-weight: 500; }
-    .font-semibold { font-weight: 600; }
-    .font-bold     { font-weight: 700; }
-    .font-mono     { font-family: 'SF Mono', 'Consolas', monospace; }
-    .text-center { text-align: center; }
-    .text-right  { text-align: right; }
-    .uppercase   { text-transform: uppercase; }
-    .tracking-wider { letter-spacing: 0.06em; }
-    .truncate    { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .hidden      { display: none; }
-    .block       { display: block; }
-    .rounded     { border-radius: 6px; }
-    .rounded-lg  { border-radius: 10px; }
-    .rounded-xl  { border-radius: 14px; }
-    .rounded-t-lg { border-radius: 10px 10px 0 0; }
-    .rounded-full { border-radius: 999px; }
-    .border      { border: 1px solid #e2e8f0; }
-    .border-b    { border-bottom: 1px solid #e2e8f0; }
-    .border-t    { border-top: 1px solid #e2e8f0; }
-    .border-b-white { border-bottom-color: white; }
-    .border-slate-50  { border-color: #f8fafc; }
-    .border-slate-100 { border-color: #f1f5f9; }
-    .cursor-pointer   { cursor: pointer; }
-    .transition-colors { transition: color 0.15s, background-color 0.15s; }
-    .transition-shadow { transition: box-shadow 0.15s; }
-    .opacity-30 { opacity: 0.3; }
-    .opacity-60 { opacity: 0.6; }
-    .bg-slate-50  { background: #f8fafc; }
-    .bg-slate-100 { background: #f1f5f9; }
-    .bg-slate-200 { background: #e2e8f0; }
-    .bg-blue-100  { background: #dbeafe; }
-    .bg-white     { background: white; }
-    .text-slate-300 { color: #cbd5e1; }
-    .text-slate-400 { color: #94a3b8; }
-    .text-slate-500 { color: #64748b; }
-    .text-slate-600 { color: #475569; }
-    .text-slate-700 { color: #334155; }
-    .text-slate-800 { color: #1e293b; }
-    .text-blue-600  { color: #2563eb; }
-    .text-blue-700  { color: #1d4ed8; }
-    .text-red-500   { color: #ef4444; }
-    .text-orange-500 { color: #f97316; }
-    .accent-blue-600 { accent-color: #2563eb; }
-    .overflow-auto   { overflow: auto; }
-    .overflow-hidden { overflow: hidden; }
-    .-mb-px { margin-bottom: -1px; }
-    .fa-spin { animation: spin 1s linear infinite; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .modal { background: white; border-radius: 14px; padding: 28px; min-width: 400px; max-width: 560px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: modalIn 0.15s ease; }
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 2000; display: flex; align-items: center; justify-content: center; }
-  </style>
+  <title>SchoolCore MVP</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-<div class="app-shell">
+  <div id="adminAuth" class="auth-shell hidden"></div>
 
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="brand">
-      <div class="brand-icon"><i class="fa fa-graduation-cap"></i></div>
-      <div>
-        <div class="brand-name">SchoolCore</div>
-        <div class="brand-sub">学籍・在留・帳票</div>
-      </div>
-    </div>
-
-    <nav class="sidebar-nav">
-      <div class="nav-section">Overview</div>
-      <a onclick="showView('dashboard')" data-view="dashboard" class="active">
-        <i class="fa fa-house nav-icon"></i> ダッシュボード
-      </a>
-      <div class="nav-section">入学管理</div>
-      <a onclick="showView('intake')" data-view="intake">
-        <i class="fa fa-door-open nav-icon"></i> 入学受付
-      </a>
-      <a onclick="showView('applicants')" data-view="applicants">
-        <i class="fa fa-users nav-icon"></i> 出願者
-      </a>
-      <a onclick="showView('coe')" data-view="coe">
-        <i class="fa fa-file-shield nav-icon"></i> COE進行
-      </a>
-      <a onclick="showView('payments')" data-view="payments">
-        <i class="fa fa-yen-sign nav-icon"></i> 入金・領収書
-      </a>
-      <div class="nav-section">在籍管理</div>
-      <a onclick="showView('students')" data-view="students">
-        <i class="fa fa-id-card nav-icon"></i> 学生
-      </a>
-      <a onclick="showView('certificates')" data-view="certificates">
-        <i class="fa fa-certificate nav-icon"></i> 証明書
-      </a>
-      <div class="nav-section">報告・書類</div>
-      <a onclick="showView('immigration')" data-view="immigration">
-        <i class="fa fa-passport nav-icon"></i> 入管報告
-      </a>
-      <a onclick="showView('annualResults')" data-view="annualResults">
-        <i class="fa fa-chart-bar nav-icon"></i> 年度結果
-      </a>
-      <a onclick="showView('documents')" data-view="documents">
-        <i class="fa fa-folder-open nav-icon"></i> 帳票台帳
-      </a>
-      <a onclick="showView('audit')" data-view="audit">
-        <i class="fa fa-clock-rotate-left nav-icon"></i> 監査ログ
-      </a>
-    </nav>
-
-    <div class="user-footer">
-      <div class="user-card">
-        <div class="user-avatar">山</div>
+  <div class="app hidden" id="adminApp">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"></div>
         <div>
-          <div class="user-name">事務局 山田</div>
-          <div class="user-role">staff</div>
+          <div class="brand-title">SchoolCore</div>
+          <div class="brand-subtitle">学籍・在留・帳票管理</div>
         </div>
       </div>
-    </div>
-  </aside>
-
-  <!-- Main -->
-  <div class="main-area">
-    <div class="topbar">
-      <div>
-        <h1 class="page-title" id="page-title">ダッシュボード</h1>
-        <p class="page-subtitle" id="page-subtitle">学籍・在留・帳票の統合管理</p>
+      <nav class="nav">
+        <div class="nav-section-label">Overview</div>
+        <button class="active" data-view="dashboard">Dashboard</button>
+        <div class="nav-section-label">Admissions</div>
+        <button data-view="intake">受付</button>
+        <button data-view="applicants">出願者</button>
+        <button data-view="coe">COE進行</button>
+        <button data-view="payments">入金・領収書</button>
+        <div class="nav-section-label">Student Life</div>
+        <button data-view="students">学生</button>
+        <button data-view="studentPortal">学生連携</button>
+        <button data-view="certificates">証明書</button>
+        <div class="nav-section-label">Reporting</div>
+        <button data-view="immigration">入管報告</button>
+        <button data-view="annualResults">年度結果</button>
+        <button data-view="documents">帳票台帳</button>
+        <button data-view="audit">監査ログ</button>
+        <button data-view="operations">運用管理</button>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="sidebar-foot-label">Internal Trial</div>
+        <div class="sidebar-foot-title">運用中のローカル環境</div>
+        <p>日々の事務フローを止めずに確認するための内部試運行版です。</p>
       </div>
-      <div class="topbar-right">
-        <div id="topbar-actions"></div>
-        <div class="divider-v"></div>
-        <a href="/apply" target="_blank" class="btn btn-secondary btn-sm">
-          <i class="fa fa-external-link"></i> 願書受付
-        </a>
-        <a href="/student" target="_blank" class="btn btn-secondary btn-sm">
-          <i class="fa fa-user-graduate"></i> 学生ポータル
-        </a>
-      </div>
-    </div>
+    </aside>
 
-    <main class="page-content">
-      <div id="dashboard"     class="view active"></div>
-      <div id="intake"        class="view"></div>
-      <div id="applicants"    class="view"></div>
-      <div id="coe"           class="view"></div>
-      <div id="payments"      class="view"></div>
-      <div id="students"      class="view"></div>
-      <div id="certificates"  class="view"></div>
-      <div id="immigration"   class="view"></div>
-      <div id="annualResults" class="view"></div>
-      <div id="documents"     class="view"></div>
-      <div id="audit"         class="view"></div>
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <div class="topbar-meta" id="topbarMeta">Overview / Daily Operations</div>
+          <h1 id="title">Dashboard</h1>
+          <p id="subtitle">実データを API から読み込むローカル MVP</p>
+        </div>
+        <div class="user-tools">
+          <div class="user-pill" id="userPill">事務局 山田 / staff</div>
+          <button class="btn compact" id="adminLogoutButton" type="button">ログアウト</button>
+        </div>
+      </header>
+
+      <section id="dashboard" class="view"></section>
+      <section id="intake" class="view hidden"></section>
+      <section id="applicants" class="view hidden"></section>
+      <section id="coe" class="view hidden"></section>
+      <section id="payments" class="view hidden"></section>
+      <section id="students" class="view hidden"></section>
+      <section id="studentPortal" class="view hidden"></section>
+      <section id="certificates" class="view hidden"></section>
+      <section id="immigration" class="view hidden"></section>
+      <section id="annualResults" class="view hidden"></section>
+      <section id="documents" class="view hidden"></section>
+      <section id="audit" class="view hidden"></section>
+      <section id="operations" class="view hidden"></section>
     </main>
   </div>
-</div>
 
-<!-- Toast -->
-<div class="toast" id="toast-container"></div>
-
-<!-- Drawer -->
-<div class="drawer-backdrop" id="drawer-backdrop" onclick="closeDrawer()"></div>
-<div class="drawer" id="drawer">
-  <div class="drawer-header">
-    <h2 class="drawer-title" id="drawer-title"></h2>
-    <button onclick="closeDrawer()" class="btn btn-ghost btn-sm"><i class="fa fa-xmark"></i></button>
-  </div>
-  <div class="drawer-body" id="drawer-body"></div>
-</div>
-
-<!-- Modal -->
-<div id="modal-container"></div>
-
-<script src="/static/app4.js"></script>
+  <div id="toast" class="toast hidden"></div>
+  <div id="modalRoot" class="modal-backdrop hidden"></div>
+  <script src="/static/app.js"></script>
 </body>
 </html>

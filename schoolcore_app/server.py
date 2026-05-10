@@ -10,6 +10,7 @@ import subprocess
 import uuid
 import hashlib
 import secrets
+import sys
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -23,6 +24,9 @@ STATIC_DIR = ROOT / "static"
 DB_PATH = ROOT / "schoolcore.sqlite3"
 UPLOAD_DIR = ROOT / "uploads"
 EXPORT_DIR = ROOT / "exports"
+BACKUP_DIR = ROOT / "backups"
+SCRIPTS_DIR = ROOT / "scripts"
+OPERATIONS_STATUS_PATH = ROOT / "operations_status.json"
 BUNDLED_PYTHON = Path.home() / ".cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3"
 BUNDLED_NODE = Path.home() / ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node"
 WITHDRAWAL_TEMPLATE_XLSX = Path("/Users/setsuiken/Desktop/工作/学生管理系统/離脱届-模板.xlsx")
@@ -57,6 +61,30 @@ def now_iso() -> str:
     return datetime.now().replace(microsecond=0).isoformat()
 
 
+def file_stat_summary(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    stat_result = path.stat()
+    return {
+        "path": str(path),
+        "size_bytes": stat_result.st_size,
+        "updated_at": datetime.fromtimestamp(stat_result.st_mtime).replace(microsecond=0).isoformat(),
+    }
+
+
+def load_operations_status() -> dict:
+    if not OPERATIONS_STATUS_PATH.exists():
+        return {}
+    try:
+        return json.loads(OPERATIONS_STATUS_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_operations_status(data: dict) -> None:
+    OPERATIONS_STATUS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def new_id() -> str:
     return str(uuid.uuid4())
 
@@ -72,6 +100,63 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return False
     salt, _ = stored_hash.split("$", 1)
     return secrets.compare_digest(hash_password(password, salt), stored_hash)
+
+
+STAFF_ROLE_PERMISSIONS = {
+    "staff": {
+        "admin_access",
+        "student_edit",
+        "sensitive_file_view",
+        "ai_check",
+        "payment_confirm",
+        "receipt_issue",
+        "certificate_issue",
+        "coe_full_send",
+        "student_portal_review",
+        "attendance_session_manage",
+    },
+    "immigration_report_staff": {
+        "admin_access",
+        "student_edit",
+        "sensitive_file_view",
+        "ai_check",
+        "payment_confirm",
+        "receipt_issue",
+        "certificate_issue",
+        "coe_full_send",
+        "student_portal_review",
+        "attendance_session_manage",
+        "immigration_generate",
+        "immigration_submit",
+    },
+    "manager": {
+        "admin_access",
+        "student_edit",
+        "sensitive_file_view",
+        "ai_check",
+        "payment_confirm",
+        "receipt_issue",
+        "certificate_issue",
+        "coe_full_send",
+        "student_portal_review",
+        "attendance_session_manage",
+        "immigration_generate",
+        "immigration_submit",
+        "account_manage",
+    },
+}
+
+
+def build_export_url(filename: str, access_token: str) -> str:
+    return f"/exports/{filename}?token={access_token}"
+
+
+def attendance_qr_url(access_code: str) -> str:
+    return f"/student?attendance_code={access_code}"
+
+
+def attendance_checkout_url(access_code: str) -> str:
+    return f"/student?checkout_code={access_code}"
 
 
 def connect() -> sqlite3.Connection:
@@ -287,6 +372,7 @@ def init_db() -> None:
           target_id text not null,
           file_path text not null,
           file_url text not null,
+          access_token text not null default '',
           created_at text not null
         );
 
@@ -356,6 +442,12 @@ def init_db() -> None:
           certificate_type text not null,
           copies integer not null default 1,
           purpose text not null default '',
+          delivery_method text not null default '電子',
+          pickup_status text not null default '',
+          preferred_pickup_date text not null default '',
+          counter_note text not null default '',
+          download_count integer not null default 0,
+          last_downloaded_at text,
           requested_by text not null default 'student',
           status text not null,
           issued_by text not null default '',
@@ -383,6 +475,25 @@ def init_db() -> None:
           expires_at text not null
         );
 
+        create table if not exists staff_accounts (
+          id text primary key,
+          login_id text not null unique,
+          display_name text not null,
+          role text not null,
+          active integer not null default 1,
+          password_hash text not null,
+          created_at text not null,
+          updated_at text not null
+        );
+
+        create table if not exists staff_sessions (
+          id text primary key,
+          staff_id text not null,
+          session_token text not null unique,
+          created_at text not null,
+          expires_at text not null
+        );
+
         create table if not exists student_attendance_records (
           id text primary key,
           student_id text not null,
@@ -393,6 +504,19 @@ def init_db() -> None:
           scheduled_minutes integer not null default 0,
           note text not null default '',
           created_at text not null
+        );
+
+        create table if not exists attendance_checkin_sessions (
+          id text primary key,
+          class_name text not null,
+          class_date text not null,
+          period_label text not null,
+          scheduled_minutes integer not null default 0,
+          access_code text not null unique,
+          status text not null,
+          created_by text not null default '',
+          created_at text not null,
+          expires_at text not null
         );
 
         create table if not exists student_leave_requests (
@@ -408,6 +532,44 @@ def init_db() -> None:
           reviewed_at text
         );
 
+        create table if not exists student_profile_change_requests (
+          id text primary key,
+          student_id text not null,
+          current_phone text not null default '',
+          requested_phone text not null default '',
+          current_address_japan text not null default '',
+          requested_address_japan text not null default '',
+          current_emergency_contact text not null default '',
+          requested_emergency_contact text not null default '',
+          reason text not null default '',
+          status text not null,
+          reviewed_note text not null default '',
+          created_at text not null,
+          reviewed_at text
+        );
+
+        create table if not exists student_residence_change_requests (
+          id text primary key,
+          student_id text not null,
+          current_residence_status text not null default '',
+          requested_residence_status text not null default '',
+          current_residence_card_no text not null default '',
+          requested_residence_card_no text not null default '',
+          current_residence_expiry text not null default '',
+          requested_residence_expiry text not null default '',
+          current_passport_no text not null default '',
+          requested_passport_no text not null default '',
+          residence_card_file_name text not null default '',
+          residence_card_file_path text not null default '',
+          passport_file_name text not null default '',
+          passport_file_path text not null default '',
+          reason text not null default '',
+          status text not null,
+          reviewed_note text not null default '',
+          created_at text not null,
+          reviewed_at text
+        );
+
         create table if not exists student_consultation_records (
           id text primary key,
           student_id text not null,
@@ -415,6 +577,7 @@ def init_db() -> None:
           staff_name text not null,
           category text not null,
           summary text not null,
+          next_meeting_date text not null default '',
           next_action text not null default '',
           created_at text not null
         );
@@ -483,12 +646,31 @@ def init_db() -> None:
           reviewed_at text,
           submitted_at text not null
         );
+
+        create table if not exists student_file_reviews (
+          id text primary key,
+          student_id text not null,
+          review_key text not null,
+          file_label text not null default '',
+          reviewed_by text not null default '',
+          reviewed_at text not null,
+          note text not null default '',
+          unique(student_id, review_key)
+        );
         """
     )
     ensure_student_columns(cur)
     ensure_student_portal_account_columns(cur)
+    ensure_export_file_columns(cur)
+    ensure_student_attendance_columns(cur)
+    ensure_attendance_checkin_session_columns(cur)
+    ensure_student_consultation_columns(cur)
+    ensure_student_leave_request_columns(cur)
+    ensure_student_profile_change_request_columns(cur)
+    ensure_student_residence_change_request_columns(cur)
     ensure_student_homework_columns(cur)
     ensure_student_bulletin_columns(cur)
+    ensure_certificate_request_columns(cur)
     for applicant in cur.execute("select id from applicants").fetchall():
         ensure_applicant_sections(cur, applicant["id"])
     cur.execute("select count(*) as count from applicants")
@@ -525,9 +707,11 @@ def init_db() -> None:
     ensure_withdrawal_template_seed(cur)
     ensure_demo_students(cur)
     ensure_student_portal_accounts(cur)
+    ensure_staff_accounts(cur)
     ensure_student_attendance_seed(cur)
     ensure_student_portal_feature_seed(cur)
     ensure_annual_completion_seed(cur)
+    backfill_export_access_tokens(cur)
     if WITHDRAWAL_TEMPLATE_XLSX.exists():
         cur.execute(
             """
@@ -553,6 +737,10 @@ def ensure_student_columns(cur: sqlite3.Cursor) -> None:
         ("residence_status", "text"),
         ("admission_date", "text"),
         ("emergency_contact", "text"),
+        ("advisor_name", "text"),
+        ("office_memo", "text"),
+        ("guardian_contact_memo", "text"),
+        ("agent_contact_memo", "text"),
         ("notes", "text"),
     ]
     for name, kind in additions:
@@ -564,6 +752,105 @@ def ensure_student_portal_account_columns(cur: sqlite3.Cursor) -> None:
     columns = {item["name"] for item in cur.execute("pragma table_info(student_portal_accounts)").fetchall()}
     if "settings_json" not in columns:
         cur.execute("alter table student_portal_accounts add column settings_json text not null default '{}'")
+
+
+def ensure_export_file_columns(cur: sqlite3.Cursor) -> None:
+    columns = {item["name"] for item in cur.execute("pragma table_info(export_files)").fetchall()}
+    if "access_token" not in columns:
+        cur.execute("alter table export_files add column access_token text not null default ''")
+
+
+def ensure_student_attendance_columns(cur: sqlite3.Cursor) -> None:
+    columns = {item["name"] for item in cur.execute("pragma table_info(student_attendance_records)").fetchall()}
+    additions = [
+        ("source_request_id", "text"),
+        ("source_session_id", "text"),
+        ("checkin_at", "text"),
+        ("checkout_at", "text"),
+        ("late_minutes", "integer"),
+        ("early_leave_minutes", "integer"),
+    ]
+    for name, definition in additions:
+        if name not in columns:
+            cur.execute(f"alter table student_attendance_records add column {name} {definition}")
+
+
+def ensure_attendance_checkin_session_columns(cur: sqlite3.Cursor) -> None:
+    columns = {item["name"] for item in cur.execute("pragma table_info(attendance_checkin_sessions)").fetchall()}
+    additions = [
+        ("start_time", "text not null default ''"),
+        ("end_time", "text not null default ''"),
+        ("late_grace_minutes", "integer not null default 5"),
+        ("absent_cutoff_minutes", "integer not null default 5"),
+        ("checkout_access_code", "text not null default ''"),
+    ]
+    for name, definition in additions:
+        if name not in columns:
+            cur.execute(f"alter table attendance_checkin_sessions add column {name} {definition}")
+
+
+def ensure_student_leave_request_columns(cur: sqlite3.Cursor) -> None:
+    columns = {item["name"] for item in cur.execute("pragma table_info(student_leave_requests)").fetchall()}
+    additions = [
+        ("created_attendance_record_id", "text"),
+        ("original_attendance_status", "text"),
+        ("original_attendance_minutes", "integer"),
+        ("original_scheduled_minutes", "integer"),
+        ("original_attendance_note", "text"),
+    ]
+    for name, kind in additions:
+        if name not in columns:
+            cur.execute(f"alter table student_leave_requests add column {name} {kind}")
+
+
+def ensure_student_consultation_columns(cur: sqlite3.Cursor) -> None:
+    columns = {item["name"] for item in cur.execute("pragma table_info(student_consultation_records)").fetchall()}
+    additions = [
+        ("next_meeting_date", "text not null default ''"),
+    ]
+    for name, definition in additions:
+        if name not in columns:
+            cur.execute(f"alter table student_consultation_records add column {name} {definition}")
+
+
+def ensure_student_profile_change_request_columns(cur: sqlite3.Cursor) -> None:
+    columns = {item["name"] for item in cur.execute("pragma table_info(student_profile_change_requests)").fetchall()}
+    additions = [
+        ("current_phone", "text not null default ''"),
+        ("requested_phone", "text not null default ''"),
+        ("current_address_japan", "text not null default ''"),
+        ("requested_address_japan", "text not null default ''"),
+        ("current_emergency_contact", "text not null default ''"),
+        ("requested_emergency_contact", "text not null default ''"),
+        ("reason", "text not null default ''"),
+        ("reviewed_note", "text not null default ''"),
+    ]
+    for name, definition in additions:
+        if name not in columns:
+            cur.execute(f"alter table student_profile_change_requests add column {name} {definition}")
+
+
+def ensure_student_residence_change_request_columns(cur: sqlite3.Cursor) -> None:
+    columns = {item["name"] for item in cur.execute("pragma table_info(student_residence_change_requests)").fetchall()}
+    additions = [
+        ("current_residence_status", "text not null default ''"),
+        ("requested_residence_status", "text not null default ''"),
+        ("current_residence_card_no", "text not null default ''"),
+        ("requested_residence_card_no", "text not null default ''"),
+        ("current_residence_expiry", "text not null default ''"),
+        ("requested_residence_expiry", "text not null default ''"),
+        ("current_passport_no", "text not null default ''"),
+        ("requested_passport_no", "text not null default ''"),
+        ("residence_card_file_name", "text not null default ''"),
+        ("residence_card_file_path", "text not null default ''"),
+        ("passport_file_name", "text not null default ''"),
+        ("passport_file_path", "text not null default ''"),
+        ("reason", "text not null default ''"),
+        ("reviewed_note", "text not null default ''"),
+    ]
+    for name, definition in additions:
+        if name not in columns:
+            cur.execute(f"alter table student_residence_change_requests add column {name} {definition}")
 
 
 def ensure_student_homework_columns(cur: sqlite3.Cursor) -> None:
@@ -585,6 +872,33 @@ def ensure_student_bulletin_columns(cur: sqlite3.Cursor) -> None:
         cur.execute("alter table student_bulletin_posts add column pinned integer not null default 0")
 
 
+def ensure_certificate_request_columns(cur: sqlite3.Cursor) -> None:
+    columns = {item["name"] for item in cur.execute("pragma table_info(certificate_requests)").fetchall()}
+    additions = [
+        ("delivery_method", "text not null default '電子'"),
+        ("pickup_status", "text not null default ''"),
+        ("preferred_pickup_date", "text not null default ''"),
+        ("counter_note", "text not null default ''"),
+        ("download_count", "integer not null default 0"),
+        ("last_downloaded_at", "text"),
+    ]
+    for name, definition in additions:
+        if name not in columns:
+            cur.execute(f"alter table certificate_requests add column {name} {definition}")
+    cur.execute("update certificate_requests set delivery_method = '電子' where ifnull(delivery_method, '') = ''")
+    cur.execute(
+        """
+        update certificate_requests
+        set pickup_status = case
+          when delivery_method = '窓口受取' then '窓口受取待ち'
+          when delivery_method = '電子+窓口' then '窓口受取待ち'
+          else '電子発行待ち'
+        end
+        where ifnull(pickup_status, '') = ''
+        """
+    )
+
+
 def ensure_student_portal_accounts(cur: sqlite3.Cursor) -> None:
     students = cur.execute("select id, student_no from students").fetchall()
     now = now_iso()
@@ -594,29 +908,47 @@ def ensure_student_portal_accounts(cur: sqlite3.Cursor) -> None:
             (student["id"],),
         ).fetchone()
         if not existing:
-            password_hash = ""
-            password_set_at = None
-            if student["id"] == "student-lin":
-                password_hash = hash_password("Lin2030!")
-                password_set_at = now
             cur.execute(
                 """
                 insert into student_portal_accounts
                 (id, student_id, login_id, password_hash, password_set_at, created_at, updated_at)
                 values (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (new_id(), student["id"], student["student_no"], password_hash, password_set_at, now, now),
+                (new_id(), student["id"], student["student_no"], "", None, now, now),
             )
-        else:
-            if not existing["password_hash"] and student["id"] == "student-lin":
-                cur.execute(
-                    """
-                    update student_portal_accounts
-                    set password_hash = ?, password_set_at = ?, updated_at = ?
-                    where student_id = ?
-                    """,
-                    (hash_password("Lin2030!"), now, now, student["id"]),
-                )
+
+
+def ensure_staff_accounts(cur: sqlite3.Cursor) -> None:
+    columns = {item["name"] for item in cur.execute("pragma table_info(staff_accounts)").fetchall()}
+    if "active" not in columns:
+        cur.execute("alter table staff_accounts add column active integer not null default 1")
+    now = now_iso()
+    accounts = [
+        ("staff-yamada", "yamada", "事務局 山田", "staff", "Yamada2026!"),
+        ("staff-nakajima", "nakajima", "中島 淳子", "immigration_report_staff", "Nakajima2026!"),
+        ("staff-admin", "admin", "SchoolCore 管理者", "manager", "Admin2026!"),
+    ]
+    for account_id, login_id, display_name, role, password in accounts:
+        existing = cur.execute("select id from staff_accounts where login_id = ?", (login_id,)).fetchone()
+        if existing:
+            continue
+        cur.execute(
+            """
+            insert into staff_accounts
+            (id, login_id, display_name, role, active, password_hash, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                account_id,
+                login_id,
+                display_name,
+                role,
+                1,
+                hash_password(password),
+                now,
+                now,
+            ),
+        )
 
 
 def ensure_student_attendance_seed(cur: sqlite3.Cursor) -> None:
@@ -671,18 +1003,18 @@ def ensure_student_portal_feature_seed(cur: sqlite3.Cursor) -> None:
     now = now_iso()
     if cur.execute("select count(*) as count from student_consultation_records").fetchone()["count"] == 0:
         consultation_rows = [
-            ("student-lin", "2026-04-18", "佐藤先生", "出席面談", "遅刻が増えているため生活リズムを確認しました。", "5月上旬に再面談"),
-            ("student-lin", "2026-03-22", "中島先生", "進路面談", "進学希望校の条件と日本語力の目標を確認しました。", "N2 模試結果を確認"),
-            ("student-mai", "2026-04-10", "山田先生", "生活面談", "在留更新前の必要書類を共有しました。", "次回は5月中旬"),
+            ("student-lin", "2026-04-18", "佐藤先生", "出席面談", "遅刻が増えているため生活リズムを確認しました。", "2026-05-12", "5月上旬に再面談"),
+            ("student-lin", "2026-03-22", "中島先生", "進路面談", "進学希望校の条件と日本語力の目標を確認しました。", "2026-05-22", "N2 模試結果を確認"),
+            ("student-mai", "2026-04-10", "山田先生", "生活面談", "在留更新前の必要書類を共有しました。", "2026-05-16", "次回は5月中旬"),
         ]
-        for student_id, meeting_date, staff_name, category, summary, next_action in consultation_rows:
+        for student_id, meeting_date, staff_name, category, summary, next_meeting_date, next_action in consultation_rows:
             cur.execute(
                 """
                 insert into student_consultation_records
-                (id, student_id, meeting_date, staff_name, category, summary, next_action, created_at)
-                values (?, ?, ?, ?, ?, ?, ?, ?)
+                (id, student_id, meeting_date, staff_name, category, summary, next_meeting_date, next_action, created_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (new_id(), student_id, meeting_date, staff_name, category, summary, next_action, now),
+                (new_id(), student_id, meeting_date, staff_name, category, summary, next_meeting_date, next_action, now),
             )
 
     if cur.execute("select count(*) as count from student_grade_records").fetchone()["count"] == 0:
@@ -800,8 +1132,8 @@ def seed(cur: sqlite3.Cursor) -> None:
     cur.execute(
         """
         insert into students
-        (id, student_no, name, nationality, status, class_name, residence_card_no, residence_expiry, attendance_rate, phone, address_japan, passport_no, birth_date, residence_status, admission_date, emergency_contact, notes, created_at)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, student_no, name, nationality, status, class_name, residence_card_no, residence_expiry, attendance_rate, phone, address_japan, passport_no, birth_date, residence_status, admission_date, emergency_contact, advisor_name, office_memo, guardian_contact_memo, agent_contact_memo, notes, created_at)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             student_1,
@@ -820,6 +1152,10 @@ def seed(cur: sqlite3.Cursor) -> None:
             "留学",
             "2025-04-09",
             "NGUYEN VAN MAI / 090-5555-1122",
+            "佐藤 美咲",
+            "電話連絡は夜間を避けること。",
+            "母へ在留更新前に必要書類をLINEで案内済み。",
+            "紹介中介なし。学校から直接連络。",
             "在籍情報テスト用",
             t,
         ),
@@ -872,6 +1208,10 @@ def ensure_demo_students(cur: sqlite3.Cursor) -> None:
             "residence_status": "留学",
             "admission_date": "2024-07-10",
             "emergency_contact": "ZHANG LI / 0086-138-0000-5512",
+            "advisor_name": "田中 直美",
+            "office_memo": "更新前に学費確認を必ず行うこと。",
+            "guardian_contact_memo": "父へ出席率の件を4月に連絡済み。次回は5月末に確認。",
+            "agent_contact_memo": "SGG留学サポート経由。COE後の来日調整は中介担当。",
             "notes": "出席率低下のため面談フォロー対象",
         },
         {
@@ -891,6 +1231,10 @@ def ensure_demo_students(cur: sqlite3.Cursor) -> None:
             "residence_status": "留学",
             "admission_date": "2025-10-08",
             "emergency_contact": "NGUYEN PHUONG / 0084-90-123-8811",
+            "advisor_name": "佐藤 美咲",
+            "office_memo": "進学希望校の願書時期を7月に再確認。",
+            "guardian_contact_memo": "保護者との直接連絡はまだなし。必要時は本人経由。",
+            "agent_contact_memo": "VN Study Agent に進学希望校の条件を共有済み。",
             "notes": "進学希望ヒアリング済み",
         },
         {
@@ -910,6 +1254,10 @@ def ensure_demo_students(cur: sqlite3.Cursor) -> None:
             "residence_status": "留学",
             "admission_date": "2025-04-09",
             "emergency_contact": "LIN HONG / 0086-139-1200-4411",
+            "advisor_name": "中島 淳子",
+            "office_memo": "在留更新対象。追加書類の差戻し歴あり。",
+            "guardian_contact_memo": "母へ追加書類差戻しを説明済み。再提出期限を共有。",
+            "agent_contact_memo": "中国側中介へ在留更新の進捗を毎週報告。",
             "notes": "在留更新優先確認対象",
         },
         {
@@ -929,6 +1277,10 @@ def ensure_demo_students(cur: sqlite3.Cursor) -> None:
             "residence_status": "留学",
             "admission_date": "2024-10-09",
             "emergency_contact": "KIM SUNGHO / 0082-10-1100-0098",
+            "advisor_name": "山田 由紀",
+            "office_memo": "年度終了報告で退学後進路の確認要。",
+            "guardian_contact_memo": "保護者へ退学後の進路確認を依頼中。",
+            "agent_contact_memo": "入学時の中介とは連絡終了。現在は学校直接対応。",
             "notes": "年度終了報告の退学後進路サンプルあり",
         },
     ]
@@ -942,7 +1294,7 @@ def ensure_demo_students(cur: sqlite3.Cursor) -> None:
                 set student_no = ?, name = ?, nationality = ?, status = ?, class_name = ?,
                     residence_card_no = ?, residence_expiry = ?, attendance_rate = ?,
                     phone = ?, address_japan = ?, passport_no = ?, birth_date = ?,
-                    residence_status = ?, admission_date = ?, emergency_contact = ?, notes = ?
+                    residence_status = ?, admission_date = ?, emergency_contact = ?, advisor_name = ?, office_memo = ?, guardian_contact_memo = ?, agent_contact_memo = ?, notes = ?
                 where id = ?
                 """,
                 (
@@ -961,6 +1313,10 @@ def ensure_demo_students(cur: sqlite3.Cursor) -> None:
                     item["residence_status"],
                     item["admission_date"],
                     item["emergency_contact"],
+                    item["advisor_name"],
+                    item["office_memo"],
+                    item["guardian_contact_memo"],
+                    item["agent_contact_memo"],
                     item["notes"],
                     student_id,
                 ),
@@ -969,8 +1325,8 @@ def ensure_demo_students(cur: sqlite3.Cursor) -> None:
             cur.execute(
                 """
                 insert into students
-                (id, student_no, name, nationality, status, class_name, residence_card_no, residence_expiry, attendance_rate, phone, address_japan, passport_no, birth_date, residence_status, admission_date, emergency_contact, notes, created_at)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, student_no, name, nationality, status, class_name, residence_card_no, residence_expiry, attendance_rate, phone, address_japan, passport_no, birth_date, residence_status, admission_date, emergency_contact, advisor_name, office_memo, guardian_contact_memo, agent_contact_memo, notes, created_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     student_id,
@@ -989,6 +1345,10 @@ def ensure_demo_students(cur: sqlite3.Cursor) -> None:
                     item["residence_status"],
                     item["admission_date"],
                     item["emergency_contact"],
+                    item["advisor_name"],
+                    item["office_memo"],
+                    item["guardian_contact_memo"],
+                    item["agent_contact_memo"],
                     item["notes"],
                     now_iso(),
                 ),
@@ -1794,7 +2154,7 @@ def export_xlsx_document(document_type: str, fields: dict, filename_prefix: str,
     if completed.returncode != 0:
         message = completed.stderr.strip() or completed.stdout.strip() or "帳票出力に失敗しました。"
         return {"ok": False, "message": message}
-    return {"ok": True, "path": str(output_path), "url": f"/exports/{filename}", "filename": filename}
+    return {"ok": True, "path": str(output_path), "filename": filename}
 
 
 def export_xls_document(document_type: str, fields: dict, filename_prefix: str, template_path: str) -> dict:
@@ -1817,7 +2177,7 @@ def export_xls_document(document_type: str, fields: dict, filename_prefix: str, 
     if completed.returncode != 0:
         message = completed.stderr.strip() or completed.stdout.strip() or "帳票出力に失敗しました。"
         return {"ok": False, "message": message}
-    return {"ok": True, "path": str(output_path), "url": f"/exports/{filename}", "filename": filename}
+    return {"ok": True, "path": str(output_path), "filename": filename}
 
 
 def cached_export(export_key: str) -> dict | None:
@@ -1827,23 +2187,40 @@ def cached_export(export_key: str) -> dict | None:
     path = Path(cached["file_path"])
     if not path.exists():
         return None
-    return {"ok": True, "path": cached["file_path"], "url": cached["file_url"], "filename": path.name, "cached": True}
+    access_token = cached["access_token"] or ""
+    file_url = cached["file_url"] or ""
+    if not access_token or not file_url:
+        access_token = access_token or secrets.token_urlsafe(24)
+        file_url = build_export_url(path.name, access_token)
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            "update export_files set access_token = ?, file_url = ? where export_key = ?",
+            (access_token, file_url, export_key),
+        )
+        conn.commit()
+        conn.close()
+    return {"ok": True, "path": cached["file_path"], "url": file_url, "filename": path.name, "cached": True}
 
 
 def save_export_cache(export_key: str, document_type: str, target_id: str, result: dict) -> None:
+    access_token = result.get("access_token") or secrets.token_urlsafe(24)
+    filename = result.get("filename") or Path(result["path"]).name
+    file_url = build_export_url(filename, access_token)
     conn = connect()
     cur = conn.cursor()
     cur.execute(
         """
         insert into export_files
-        (id, export_key, document_type, target_id, file_path, file_url, created_at)
-        values (?, ?, ?, ?, ?, ?, ?)
+        (id, export_key, document_type, target_id, file_path, file_url, access_token, created_at)
+        values (?, ?, ?, ?, ?, ?, ?, ?)
         on conflict(export_key) do update set
           file_path = excluded.file_path,
           file_url = excluded.file_url,
+          access_token = excluded.access_token,
           created_at = excluded.created_at
         """,
-        (new_id(), export_key, document_type, target_id, result["path"], result["url"], now_iso()),
+        (new_id(), export_key, document_type, target_id, result["path"], file_url, access_token, now_iso()),
     )
     conn.commit()
     conn.close()
@@ -1855,9 +2232,24 @@ def warm_export_cache(export_key: str, document_type: str, target_id: str, expor
         return cached
     result = exporter()
     if result.get("ok"):
+        result["access_token"] = result.get("access_token") or secrets.token_urlsafe(24)
+        result["url"] = build_export_url(result.get("filename") or Path(result["path"]).name, result["access_token"])
         save_export_cache(export_key, document_type, target_id, result)
         return result
     return None
+
+
+def backfill_export_access_tokens(cur: sqlite3.Cursor) -> None:
+    items = cur.execute("select id, file_path, access_token from export_files").fetchall()
+    for item in items:
+        path = Path(item["file_path"])
+        if not path.name:
+            continue
+        access_token = item["access_token"] or secrets.token_urlsafe(24)
+        cur.execute(
+            "update export_files set access_token = ?, file_url = ? where id = ?",
+            (access_token, build_export_url(path.name, access_token), item["id"]),
+        )
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1866,6 +2258,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+        query = parse_qs(parsed.query)
         if path == "/":
             return self.serve_file(STATIC_DIR / "index.html")
         if path == "/apply":
@@ -1873,13 +2266,29 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/student":
             return self.serve_file(STATIC_DIR / "student.html")
         if path.startswith("/exports/"):
-            return self.serve_file(EXPORT_DIR / Path(unquote(path.removeprefix("/exports/"))).name)
+            return self.serve_export_file(Path(unquote(path.removeprefix("/exports/"))).name, query.get("token", [""])[0])
+        if path.startswith("/api/student-residence-change-files/"):
+            parts = path.split("/")
+            if len(parts) >= 5:
+                return self.serve_residence_change_file(parts[3], parts[4], query.get("session_token", [""])[0], public=False)
+        if path.startswith("/api/public/residence-change-files/"):
+            parts = path.split("/")
+            if len(parts) >= 6:
+                return self.serve_residence_change_file(parts[4], parts[5], query.get("session_token", [""])[0], public=True)
         if path.startswith("/static/"):
             return self.serve_file(STATIC_DIR / path.removeprefix("/static/"))
         if path == "/api/health":
             return self.json({"ok": True, "time": now_iso()})
+        if path == "/api/staff-session":
+            return self.staff_session()
+        if path.startswith("/api/") and not path.startswith("/api/public/"):
+            staff = self.require_staff_session()
+            if not staff:
+                return
         if path == "/api/dashboard":
             return self.json(self.dashboard())
+        if path == "/api/operations-summary":
+            return self.json(self.operations_summary())
         if path == "/api/intake-summary":
             return self.json(self.intake_summary())
         if path == "/api/receipt-config":
@@ -1906,6 +2315,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(self.annual_results_overview())
         if path == "/api/certificate-requests":
             return self.json(self.certificate_requests())
+        if path == "/api/attendance-checkin-sessions":
+            return self.json(self.attendance_checkin_sessions())
+        if path.startswith("/api/attendance-checkin-sessions/") and path.count("/") == 3:
+            session_id = path.split("/")[3]
+            return self.json(self.attendance_checkin_session_detail(session_id))
         if path == "/api/student-portal-admin":
             return self.json(self.student_portal_admin())
         if path == "/api/public/student-lookup":
@@ -1960,10 +2374,22 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+        if path == "/api/staff-login":
+            body = self.read_json()
+            return self.staff_login(body)
         if path == "/api/import-batches/upload":
+            staff = self.require_staff_session()
+            if not staff:
+                return
             return self.upload_import_batch()
+        if path.startswith("/api/") and not path.startswith("/api/public/"):
+            staff = self.require_staff_session()
+            if not staff:
+                return
         if path == "/api/public/homework-submission":
             return self.create_public_homework_submission()
+        if path == "/api/public/residence-change-request-upload":
+            return self.create_public_residence_change_request_upload()
         body = self.read_json()
 
         if path == "/api/applicants":
@@ -1980,6 +2406,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.public_student_session(body)
         if path == "/api/public/student-settings":
             return self.update_public_student_settings(body)
+        if path == "/api/public/attendance-checkin":
+            return self.create_public_attendance_checkin(body)
+        if path == "/api/public/attendance-checkout":
+            return self.create_public_attendance_checkout(body)
+        if path == "/api/public/profile-change-request":
+            return self.create_public_profile_change_request(body)
+        if path == "/api/public/residence-change-request":
+            return self.create_public_residence_change_request(body)
         if path == "/api/public/group-message":
             return self.create_public_group_message(body)
         if path == "/api/public/leave-request":
@@ -1988,6 +2422,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.public_student_lookup(body)
         if path == "/api/public/certificate-request":
             return self.create_public_certificate_request(body)
+        if path == "/api/public/certificate-download-track":
+            return self.track_public_certificate_download(body)
+        if path == "/api/operations/run-backup":
+            return self.run_operations_backup()
+        if path == "/api/operations/run-smoke-check":
+            return self.run_operations_smoke_check(body)
         if path.startswith("/api/applicants/") and path.endswith("/application-fee"):
             applicant_id = path.split("/")[3]
             return self.create_application_fee(applicant_id, body)
@@ -2009,6 +2449,12 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/students/") and path.endswith("/withdrawal-document"):
             student_id = path.split("/")[3]
             return self.generate_withdrawal_document(student_id)
+        if path.startswith("/api/students/") and path.endswith("/consultations"):
+            student_id = path.split("/")[3]
+            return self.create_student_consultation_record(student_id, body)
+        if path.startswith("/api/students/") and path.endswith("/related-files/review"):
+            student_id = path.split("/")[3]
+            return self.mark_student_related_file_review(student_id, body)
         if path.startswith("/api/students/") and path.count("/") == 3:
             student_id = path.split("/")[3]
             return self.update_student(student_id, body)
@@ -2033,6 +2479,21 @@ class Handler(BaseHTTPRequestHandler):
             return self.create_annual_result(body)
         if path == "/api/certificate-requests":
             return self.create_certificate_request(body)
+        if path == "/api/attendance-checkin-sessions":
+            return self.create_attendance_checkin_session(body)
+        if path == "/api/staff-accounts":
+            return self.create_staff_account(body)
+        if path.startswith("/api/staff-accounts/") and path.endswith("/status"):
+            staff_id = path.split("/")[3]
+            return self.update_staff_account_status(staff_id, body)
+        if path.startswith("/api/staff-accounts/") and path.endswith("/reset-password"):
+            staff_id = path.split("/")[3]
+            return self.reset_staff_account_password(staff_id, body)
+        if path.startswith("/api/attendance-checkin-sessions/") and path.endswith("/manual-update"):
+            session_id = path.split("/")[3]
+            return self.manual_update_attendance_checkin_session(session_id, body)
+        if path == "/api/attendance-checkin-sessions/close":
+            return self.close_attendance_checkin_session(body)
         if path == "/api/student-bulletins":
             return self.create_student_bulletin(body)
         if path.startswith("/api/student-bulletins/") and path.endswith("/pin"):
@@ -2046,6 +2507,12 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/student-homework-submissions/") and path.endswith("/review"):
             submission_id = path.split("/")[3]
             return self.review_student_homework_submission(submission_id, body)
+        if path.startswith("/api/student-profile-change-requests/") and path.endswith("/review"):
+            request_id = path.split("/")[3]
+            return self.review_student_profile_change_request(request_id, body)
+        if path.startswith("/api/student-residence-change-requests/") and path.endswith("/review"):
+            request_id = path.split("/")[3]
+            return self.review_student_residence_change_request(request_id, body)
         if path.startswith("/api/class-group-messages/") and path.endswith("/delete"):
             message_id = path.split("/")[3]
             return self.delete_group_message(message_id)
@@ -2055,6 +2522,9 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/certificate-requests/") and path.endswith("/issue"):
             request_id = path.split("/")[3]
             return self.issue_certificate_request(request_id)
+        if path.startswith("/api/certificate-requests/") and path.endswith("/pickup"):
+            request_id = path.split("/")[3]
+            return self.mark_certificate_pickup_received(request_id)
         if path.startswith("/api/annual-results/") and path.endswith("/update"):
             result_id = path.split("/")[3]
             return self.update_annual_result(result_id, body)
@@ -2102,6 +2572,203 @@ class Handler(BaseHTTPRequestHandler):
             "latest_batch": latest_batch,
         }
 
+    def operations_summary(self) -> dict:
+        staff = self.current_staff()
+        status = load_operations_status()
+        backup_dirs = sorted([item for item in BACKUP_DIR.iterdir() if item.is_dir()], reverse=True) if BACKUP_DIR.exists() else []
+        latest_backup_dir = backup_dirs[0] if backup_dirs else None
+        latest_backup_files = []
+        if latest_backup_dir:
+            for name in ("schoolcore.sqlite3", "uploads", "exports", "README.txt"):
+                path = latest_backup_dir / name
+                if path.exists():
+                    latest_backup_files.append(
+                        {
+                            "name": name,
+                            "type": "directory" if path.is_dir() else "file",
+                            "size_bytes": path.stat().st_size if path.is_file() else 0,
+                        }
+                    )
+
+        staff_accounts = []
+        if self.staff_has_permission(staff, "account_manage"):
+            for item in rows("select id, login_id, display_name, role, active, created_at, updated_at from staff_accounts order by role asc, display_name asc"):
+                staff_accounts.append(
+                    {
+                        **item,
+                        "status": "有効" if item.get("active", 1) else "停止中",
+                        "permissions": sorted(STAFF_ROLE_PERMISSIONS.get(item.get("role") or "", set())),
+                    }
+                )
+
+        last_backup = status.get("backup_run") or {}
+        last_smoke = status.get("smoke_check") or {}
+        return {
+            "current_staff": self.staff_session_payload(staff)["staff"] if staff else None,
+            "summary": {
+                "staff_account_count": row("select count(*) as count from staff_accounts")["count"],
+                "backup_count": len(backup_dirs),
+                "latest_backup_status": last_backup.get("status") or ("ready" if latest_backup_dir else "not_run"),
+                "latest_smoke_status": last_smoke.get("status") or "not_run",
+                "latest_backup_at": last_backup.get("finished_at") or (latest_backup_dir.name if latest_backup_dir else ""),
+                "latest_smoke_at": last_smoke.get("finished_at") or "",
+            },
+            "database": file_stat_summary(DB_PATH),
+            "scripts": {
+                "backup": file_stat_summary(SCRIPTS_DIR / "backup_local_data.sh"),
+                "smoke_check": file_stat_summary(SCRIPTS_DIR / "internal_trial_smoke_check.py"),
+            },
+            "latest_backup": {
+                "path": str(latest_backup_dir) if latest_backup_dir else "",
+                "label": latest_backup_dir.name if latest_backup_dir else "",
+                "files": latest_backup_files,
+            },
+            "last_backup_run": last_backup,
+            "last_smoke_check": last_smoke,
+            "staff_accounts": staff_accounts,
+        }
+
+    def run_operations_backup(self) -> None:
+        staff = self.current_staff()
+        if not self.require_staff_permission(staff, "account_manage", "バックアップの実行は manager のみ行えます。"):
+            return
+        command = ["/bin/zsh", str(SCRIPTS_DIR / "backup_local_data.sh")]
+        started_at = now_iso()
+        result = subprocess.run(command, cwd=str(ROOT), capture_output=True, text=True, timeout=120)
+        latest_backup_dir = sorted([item for item in BACKUP_DIR.iterdir() if item.is_dir()], reverse=True)[0] if BACKUP_DIR.exists() and any(item.is_dir() for item in BACKUP_DIR.iterdir()) else None
+        status = load_operations_status()
+        status["backup_run"] = {
+            "status": "ok" if result.returncode == 0 else "error",
+            "started_at": started_at,
+            "finished_at": now_iso(),
+            "command": " ".join(command),
+            "stdout": result.stdout.strip(),
+            "stderr": result.stderr.strip(),
+            "backup_path": str(latest_backup_dir) if latest_backup_dir else "",
+        }
+        save_operations_status(status)
+        conn = connect()
+        cur = conn.cursor()
+        write_audit(cur, "operations.backup", "system", "backup", f"内部試運行バックアップを実行しました。結果: {status['backup_run']['status']}")
+        conn.commit()
+        conn.close()
+        return self.json({"ok": result.returncode == 0, "result": status["backup_run"]})
+
+    def run_operations_smoke_check(self, body: dict) -> None:
+        staff = self.current_staff()
+        if not self.require_staff_permission(staff, "account_manage", "自検実行は manager のみ行えます。"):
+            return
+        include_student_login = bool(body.get("include_student_login", True))
+        python_bin = str(BUNDLED_PYTHON if BUNDLED_PYTHON.exists() else Path(sys.executable))
+        command = [python_bin, str(SCRIPTS_DIR / "internal_trial_smoke_check.py")]
+        env = dict(os.environ)
+        env.setdefault("SCHOOLCORE_BASE_URL", "http://127.0.0.1:8766")
+        env.setdefault("SCHOOLCORE_STAFF_LOGIN", "yamada")
+        env.setdefault("SCHOOLCORE_STAFF_PASSWORD", "Yamada2026!")
+        if include_student_login:
+            env["SCHOOLCORE_STUDENT_LOGIN"] = body.get("student_login") or "202604203"
+            env["SCHOOLCORE_STUDENT_PASSWORD"] = body.get("student_password") or "Lin2030!"
+        else:
+            env.pop("SCHOOLCORE_STUDENT_LOGIN", None)
+            env.pop("SCHOOLCORE_STUDENT_PASSWORD", None)
+        started_at = now_iso()
+        result = subprocess.run(command, cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=180)
+        status = load_operations_status()
+        status["smoke_check"] = {
+            "status": "ok" if result.returncode == 0 else "error",
+            "started_at": started_at,
+            "finished_at": now_iso(),
+            "command": " ".join(command),
+            "include_student_login": include_student_login,
+            "stdout": result.stdout.strip(),
+            "stderr": result.stderr.strip(),
+        }
+        save_operations_status(status)
+        conn = connect()
+        cur = conn.cursor()
+        write_audit(cur, "operations.smoke_check", "system", "smoke_check", f"内部試運行自検を実行しました。結果: {status['smoke_check']['status']}")
+        conn.commit()
+        conn.close()
+        return self.json({"ok": result.returncode == 0, "result": status["smoke_check"]})
+
+    def create_staff_account(self, body: dict) -> None:
+        staff = self.current_staff()
+        if not self.require_staff_permission(staff, "account_manage", "アカウントの追加は manager のみ行えます。"):
+            return
+        login_id = (body.get("login_id") or "").strip()
+        display_name = (body.get("display_name") or "").strip()
+        role = (body.get("role") or "").strip()
+        password = body.get("password") or ""
+        if not login_id or not display_name or not role or not password:
+            return self.json_error("VALIDATION_ERROR", "ログインID、表示名、役割、初期パスワードを入力してください。", status=422)
+        if role not in STAFF_ROLE_PERMISSIONS:
+            return self.json_error("VALIDATION_ERROR", "役割が不正です。", status=422)
+        if len(password) < 8:
+            return self.json_error("VALIDATION_ERROR", "初期パスワードは8文字以上で設定してください。", status=422)
+        existing = row("select id from staff_accounts where login_id = ?", (login_id,))
+        if existing:
+            return self.json_error("VALIDATION_ERROR", "同じログインIDがすでに存在します。", status=422)
+        created_id = new_id()
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            insert into staff_accounts
+            (id, login_id, display_name, role, active, password_hash, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (created_id, login_id, display_name, role, 1, hash_password(password), now_iso(), now_iso()),
+        )
+        write_audit(cur, "operations.staff_account_create", "staff", created_id, f"staffアカウント {display_name} ({login_id}) を追加しました。")
+        conn.commit()
+        conn.close()
+        account = row("select id, login_id, display_name, role, active, created_at from staff_accounts where id = ?", (created_id,))
+        return self.json({"ok": True, "account": account})
+
+    def update_staff_account_status(self, staff_id: str, body: dict) -> None:
+        staff = self.current_staff()
+        if not self.require_staff_permission(staff, "account_manage", "アカウント状態の更新は manager のみ行えます。"):
+            return
+        target = row("select * from staff_accounts where id = ?", (staff_id,))
+        if not target:
+            return self.json_error("NOT_FOUND", "アカウントが見つかりません。", status=404)
+        active = 1 if body.get("active") else 0
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            "update staff_accounts set active = ?, updated_at = ? where id = ?",
+            (active, now_iso(), staff_id),
+        )
+        if not active:
+            cur.execute("delete from staff_sessions where staff_id = ?", (staff_id,))
+        write_audit(cur, "operations.staff_account_status", "staff", staff_id, f"staffアカウント {target['login_id']} を {'有効' if active else '停止'} に更新しました。")
+        conn.commit()
+        conn.close()
+        account = row("select id, login_id, display_name, role, active, created_at from staff_accounts where id = ?", (staff_id,))
+        return self.json({"ok": True, "account": account})
+
+    def reset_staff_account_password(self, staff_id: str, body: dict) -> None:
+        staff = self.current_staff()
+        if not self.require_staff_permission(staff, "account_manage", "アカウントのパスワード再設定は manager のみ行えます。"):
+            return
+        target = row("select * from staff_accounts where id = ?", (staff_id,))
+        if not target:
+            return self.json_error("NOT_FOUND", "アカウントが見つかりません。", status=404)
+        password = body.get("password") or ""
+        if len(password) < 8:
+            return self.json_error("VALIDATION_ERROR", "新しいパスワードは8文字以上で設定してください。", status=422)
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            "update staff_accounts set password_hash = ?, updated_at = ? where id = ?",
+            (hash_password(password), now_iso(), staff_id),
+        )
+        cur.execute("delete from staff_sessions where staff_id = ?", (staff_id,))
+        write_audit(cur, "operations.staff_account_reset_password", "staff", staff_id, f"staffアカウント {target['login_id']} のパスワードを再設定しました。")
+        conn.commit()
+        conn.close()
+        return self.json({"ok": True})
+
     def students(self) -> list[dict]:
         items = rows("select * from students order by student_no asc, created_at asc")
         today = datetime.now().date()
@@ -2131,6 +2798,15 @@ class Handler(BaseHTTPRequestHandler):
         if not student:
             return None
         annual = self.annual_results_overview()
+        attendance = self.attendance_overview_for_student(student_id)
+        consultations = self.consultation_records_for_student(student_id)
+        profile_change_requests = self.profile_change_requests_for_student(student_id)
+        residence_change_requests = self.residence_change_requests_for_student(student_id)
+        certificate_requests = self.certificate_requests_for_student(student_id)
+        recent_documents = self.recent_documents_for_student(student_id)
+        recent_attendance_adjustments = self.recent_attendance_adjustments_for_student(student_id)
+        related_files = self.related_files_for_student(student_id)
+        next_consultation = next((item for item in consultations if (item.get("next_meeting_date") or "").strip()), None)
         results = []
         for key in ("advancement", "employment", "exams", "withdrawals"):
             results.extend([item for item in annual.get(key, []) if item["student_id"] == student_id])
@@ -2149,7 +2825,17 @@ class Handler(BaseHTTPRequestHandler):
                 "days_to_expiry": days_to_expiry,
                 "attendance_warning": float(student.get("attendance_rate") or 0) < 80,
                 "annual_result_count": len(results),
+                "next_consultation_date": next_consultation.get("next_meeting_date") if next_consultation else "",
+                "next_consultation_action": next_consultation.get("next_action") if next_consultation else "",
             },
+            "attendance": attendance,
+            "consultations": consultations[:8],
+            "profile_change_requests": profile_change_requests[:8],
+            "residence_change_requests": residence_change_requests[:8],
+            "certificate_requests": certificate_requests[:8],
+            "recent_documents": recent_documents,
+            "recent_attendance_adjustments": recent_attendance_adjustments,
+            "related_files": related_files,
             "annual_results": results[:5],
         }
 
@@ -2170,6 +2856,206 @@ class Handler(BaseHTTPRequestHandler):
             """,
             (student_id,),
         )
+
+    def recent_documents_for_student(self, student_id: str) -> list[dict]:
+        return rows(
+            """
+            select * from (
+              select
+                gd.document_type as document_type,
+                gd.document_no as document_no,
+                gd.created_at as created_at,
+                substr(gd.created_at, 1, 10) as issue_date,
+                coalesce(cr.purpose, '') as subject_name,
+                ef.file_url as file_url
+              from generated_documents gd
+              left join certificate_requests cr on gd.target_type = 'certificate_request' and cr.id = gd.target_id
+              left join export_files ef on ef.export_key = ('certificate:' || gd.target_id || ':' || gd.document_no)
+              where gd.document_type in ('出席率証明書', '成績証明書', '修了証明書')
+                and cr.student_id = ?
+
+              union all
+
+              select
+                gd.document_type as document_type,
+                gd.document_no as document_no,
+                gd.created_at as created_at,
+                substr(gd.created_at, 1, 10) as issue_date,
+                '' as subject_name,
+                ef.file_url as file_url
+              from generated_documents gd
+              left join export_files ef on ef.export_key =
+                case
+                  when gd.document_type = '離脱届' then ('withdrawal:' || gd.target_id || ':' || gd.document_no)
+                  when gd.document_type = '在留更新許可申請書' then ('residence_renewal_form:' || gd.target_id || ':' || gd.document_no)
+                  else ''
+                end
+              where gd.target_type = 'student'
+                and gd.target_id = ?
+                and gd.document_type in ('離脱届', '在留更新許可申請書')
+            )
+            order by created_at desc
+            limit 10
+            """,
+            (student_id, student_id),
+        )
+
+    def recent_attendance_adjustments_for_student(self, student_id: str) -> list[dict]:
+        return rows(
+            """
+            select
+              class_date,
+              period_label,
+              status,
+              attendance_minutes,
+              scheduled_minutes,
+              note,
+              late_minutes,
+              early_leave_minutes,
+              ifnull(checkout_at, checkin_at) as action_at
+            from student_attendance_records
+            where student_id = ?
+              and note like '手動補録%'
+            order by class_date desc, action_at desc, created_at desc
+            limit 8
+            """,
+            (student_id,),
+        )
+
+    def related_files_for_student(self, student_id: str) -> list[dict]:
+        items: list[dict] = []
+        review_map = {
+            item["review_key"]: item
+            for item in rows(
+                """
+                select review_key, reviewed_by, reviewed_at, note
+                from student_file_reviews
+                where student_id = ?
+                """,
+                (student_id,),
+            )
+        }
+        certificate_types = {"出席率証明書", "成績証明書", "修了証明書"}
+        immigration_types = {"離脱届", "在留更新許可申請書"}
+        for document in self.recent_documents_for_student(student_id):
+            if document.get("file_url"):
+                document_type = document.get("document_type") or "帳票"
+                category = "帳票"
+                if document_type in certificate_types:
+                    category = "証明書"
+                elif document_type in immigration_types:
+                    category = "入管・在籍帳票"
+                issue_date = document.get("issue_date") or str(document.get("created_at") or "")[:10]
+                review_key = f"export:{document_type}:{document.get('document_no') or issue_date}"
+                review = review_map.get(review_key) or {}
+                items.append(
+                    {
+                        "label": document_type,
+                        "sub_label": document.get("document_no") or document.get("issue_date") or "",
+                        "date_label": "発行日",
+                        "date_value": issue_date or "",
+                        "url": document.get("file_url") or "",
+                        "kind": "export",
+                        "category": category,
+                        "review_key": review_key,
+                        "reviewed_by": review.get("reviewed_by") or "",
+                        "reviewed_at": review.get("reviewed_at") or "",
+                        "review_note": review.get("note") or "",
+                    }
+                )
+        latest_residence_change = row(
+            """
+            select *
+            from student_residence_change_requests
+            where student_id = ?
+              and (ifnull(residence_card_file_path, '') <> '' or ifnull(passport_file_path, '') <> '')
+            order by created_at desc
+            limit 1
+            """,
+            (student_id,),
+        )
+        if latest_residence_change:
+            request_id = latest_residence_change["id"]
+            submitted_date = str(latest_residence_change.get("created_at") or "")[:10]
+            if latest_residence_change.get("residence_card_file_path"):
+                review_key = f"attachment:{request_id}:residence-card"
+                review = review_map.get(review_key) or {}
+                items.append(
+                    {
+                        "label": "在留カード画像",
+                        "sub_label": latest_residence_change.get("status") or "在留情報変更申請",
+                        "date_label": "提出日",
+                        "date_value": submitted_date,
+                        "url": f"/api/student-residence-change-files/{request_id}/residence-card",
+                        "kind": "attachment",
+                        "category": "学生提出",
+                        "review_key": review_key,
+                        "reviewed_by": review.get("reviewed_by") or "",
+                        "reviewed_at": review.get("reviewed_at") or "",
+                        "review_note": review.get("note") or "",
+                    }
+                )
+            if latest_residence_change.get("passport_file_path"):
+                review_key = f"attachment:{request_id}:passport"
+                review = review_map.get(review_key) or {}
+                items.append(
+                    {
+                        "label": "旅券画像",
+                        "sub_label": latest_residence_change.get("status") or "在留情報変更申請",
+                        "date_label": "提出日",
+                        "date_value": submitted_date,
+                        "url": f"/api/student-residence-change-files/{request_id}/passport",
+                        "kind": "attachment",
+                        "category": "学生提出",
+                        "review_key": review_key,
+                        "reviewed_by": review.get("reviewed_by") or "",
+                        "reviewed_at": review.get("reviewed_at") or "",
+                        "review_note": review.get("note") or "",
+                    }
+                )
+        items.sort(
+            key=lambda item: (
+                str(item.get("date_value") or ""),
+                str(item.get("sub_label") or ""),
+            ),
+            reverse=True,
+        )
+        return items[:12]
+
+    def mark_student_related_file_review(self, student_id: str, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_edit", "関連ファイルの確認記録は staff / 入管担当 / manager のみ実行できます。"):
+            return
+        review_key = (body.get("review_key") or "").strip()
+        file_label = (body.get("file_label") or "").strip()
+        note = (body.get("note") or "").strip()
+        if not review_key:
+            return self.json_error("VALIDATION_ERROR", "確認対象のファイルが不明です。", status=422)
+        related_files = self.related_files_for_student(student_id)
+        target = next((item for item in related_files if item.get("review_key") == review_key), None)
+        if not target:
+            return self.json_error("NOT_FOUND", "関連ファイルが見つかりません。", status=404)
+        staff = self.current_staff() or {}
+        reviewed_by = staff.get("display_name") or staff.get("login_id") or "staff"
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            insert into student_file_reviews
+            (id, student_id, review_key, file_label, reviewed_by, reviewed_at, note)
+            values (?, ?, ?, ?, ?, ?, ?)
+            on conflict(student_id, review_key) do update set
+              file_label = excluded.file_label,
+              reviewed_by = excluded.reviewed_by,
+              reviewed_at = excluded.reviewed_at,
+              note = excluded.note
+            """,
+            (new_id(), student_id, review_key, file_label or (target.get("label") or ""), reviewed_by, now_iso(), note),
+        )
+        write_audit(cur, "student.file_review", "student", student_id, f"関連ファイルを確認しました。{file_label or target.get('label') or review_key}")
+        conn.commit()
+        conn.close()
+        updated = next((item for item in self.related_files_for_student(student_id) if item.get("review_key") == review_key), None)
+        return self.json({"ok": True, "item": updated})
 
     def attendance_overview_for_student(self, student_id: str) -> dict:
         records = rows(
@@ -2210,7 +3096,272 @@ class Handler(BaseHTTPRequestHandler):
             },
             "records": records,
             "leave_requests": leave_requests,
+            "recent_checkins": [
+                item for item in records
+                if (item.get("source_session_id") or "").strip()
+            ][:5],
         }
+
+    def attendance_checkin_sessions(self) -> dict:
+        sessions = rows(
+            """
+            select
+              s.*,
+              (
+                select count(*)
+                from student_attendance_records ar
+                join students st on st.id = ar.student_id
+                where ar.class_date = s.class_date
+                  and ar.period_label = s.period_label
+                  and st.class_name = s.class_name
+                  and ifnull(st.status, '') not in ('退学', '卒業')
+              ) as attendee_count
+            from attendance_checkin_sessions s
+            order by
+              case when s.status = 'active' then 0 else 1 end,
+              s.class_date desc,
+              s.created_at desc
+            limit 30
+            """
+        )
+        session_items = []
+        for item in sessions:
+            session_dict = dict(item)
+            missing_students = self.missing_students_for_session(session_dict["id"], limit=12)
+            checked_out_count = row(
+                """
+                select count(*) as count
+                from student_attendance_records ar
+                join students st on st.id = ar.student_id
+                where ar.class_date = ?
+                  and ar.period_label = ?
+                  and st.class_name = ?
+                  and ifnull(st.status, '') not in ('退学', '卒業')
+                  and ifnull(checkout_at, '') <> ''
+                """,
+                (session_dict["class_date"], session_dict["period_label"], session_dict["class_name"]),
+            )["count"]
+            session_items.append(
+                {
+                    **session_dict,
+                    "checkin_url": attendance_qr_url(session_dict["access_code"]),
+                    "checkout_url": attendance_checkout_url(session_dict.get("checkout_access_code") or ""),
+                    "missing_student_count": len(missing_students),
+                    "missing_students": [dict(student) for student in missing_students],
+                    "checked_out_count": checked_out_count,
+                }
+            )
+        return {
+            "summary": {
+                "active_count": sum(1 for item in sessions if item["status"] == "active"),
+                "today_count": sum(1 for item in sessions if item["class_date"] == datetime.now().strftime("%Y-%m-%d")),
+            },
+            "sessions": session_items,
+        }
+
+    def missing_students_for_session(self, session_id: str, limit: int | None = None) -> list[dict]:
+        session = row("select * from attendance_checkin_sessions where id = ?", (session_id,))
+        if not session:
+            return []
+        sql = """
+            select st.id, st.student_no, st.name, st.status
+            from students st
+            where st.class_name = ?
+              and ifnull(st.status, '') not in ('退学', '卒業')
+              and not exists (
+                select 1
+                from student_attendance_records ar
+                where ar.student_id = st.id
+                  and ar.class_date = ?
+                  and ar.period_label = ?
+              )
+            order by st.student_no
+        """
+        params: tuple = (session["class_name"], session["class_date"], session["period_label"])
+        if limit:
+            sql += " limit ?"
+            params = (session["class_name"], session["class_date"], session["period_label"], limit)
+        return rows(sql, params)
+
+    def attendance_checkin_session_detail(self, session_id: str) -> dict:
+        session = row("select * from attendance_checkin_sessions where id = ?", (session_id,))
+        if not session:
+            return {"ok": False, "message": "出席セッションが見つかりません。"}
+        attendees = rows(
+            """
+            select
+              ar.*,
+              st.student_no,
+              st.name,
+              st.class_name
+            from student_attendance_records ar
+            left join students st on st.id = ar.student_id
+            where ar.class_date = ?
+              and ar.period_label = ?
+              and ifnull(st.class_name, '') = ?
+            order by st.student_no asc, ar.created_at asc
+            """,
+            (session["class_date"], session["period_label"], session["class_name"]),
+        )
+        missing_students = self.missing_students_for_session(session_id)
+        summary = {"出席": 0, "遅刻": 0, "早退": 0, "欠席": 0, "公欠": 0}
+        for item in attendees:
+            status = item.get("status") or ""
+            if status in summary:
+                summary[status] += 1
+        manual_updates = [
+            {
+                "student_id": item.get("student_id"),
+                "student_no": item.get("student_no"),
+                "name": item.get("name"),
+                "status": item.get("status"),
+                "note": item.get("note"),
+                "checkin_at": item.get("checkin_at"),
+                "checkout_at": item.get("checkout_at"),
+                "late_minutes": item.get("late_minutes") or 0,
+                "early_leave_minutes": item.get("early_leave_minutes") or 0,
+            }
+            for item in attendees
+            if str(item.get("note") or "").startswith("手動補録")
+        ]
+        return {
+            "ok": True,
+            "session": {
+                **session,
+                "checkin_url": attendance_qr_url(session["access_code"]),
+                "checkout_url": attendance_checkout_url(session.get("checkout_access_code") or ""),
+            },
+            "summary": {
+                "attendee_count": len(attendees),
+                "checked_out_count": sum(1 for item in attendees if item.get("checkout_at")),
+                "missing_student_count": len(missing_students),
+                "status_counts": summary,
+            },
+            "attendees": attendees,
+            "missing_students": missing_students,
+            "manual_updates": manual_updates,
+        }
+
+    def manual_update_attendance_checkin_session(self, session_id: str, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "attendance_session_manage", "出席の手動補録・修正は staff / 入管担当 / manager のみ実行できます。"):
+            return
+        session = row("select * from attendance_checkin_sessions where id = ?", (session_id,))
+        if not session:
+            return self.json_error("NOT_FOUND", "出席セッションが見つかりません。", status=404)
+        student_id = (body.get("student_id") or "").strip()
+        status = (body.get("status") or "").strip()
+        note = (body.get("note") or "").strip()
+        if not student_id or status not in {"出席", "遅刻", "早退", "欠席", "公欠"}:
+            return self.json_error("VALIDATION_ERROR", "学生と状態を正しく指定してください。", status=422)
+        student = row("select * from students where id = ?", (student_id,))
+        if not student:
+            return self.json_error("NOT_FOUND", "学生が見つかりません。", status=404)
+        if (student.get("class_name") or "").strip() != (session.get("class_name") or "").strip():
+            return self.json_error("FORBIDDEN", "この授業のクラスに所属する学生のみ更新できます。", status=403)
+        scheduled_minutes = int(session.get("scheduled_minutes") or 0)
+        try:
+            raw_late_minutes = max(0, int(body.get("late_minutes") or 0))
+            raw_early_leave_minutes = max(0, int(body.get("early_leave_minutes") or 0))
+        except (TypeError, ValueError):
+            return self.json_error("VALIDATION_ERROR", "遅刻・早退分は数字で入力してください。", status=422)
+        late_minutes = 0
+        early_leave_minutes = 0
+        attendance_minutes = scheduled_minutes
+        if status == "欠席":
+            attendance_minutes = 0
+        elif status == "公欠":
+            attendance_minutes = scheduled_minutes
+        elif status == "遅刻":
+            late_minutes = max(1, raw_late_minutes or 1)
+            attendance_minutes = max(0, scheduled_minutes - late_minutes)
+        elif status == "早退":
+            early_leave_minutes = max(1, raw_early_leave_minutes or 1)
+            attendance_minutes = max(0, scheduled_minutes - early_leave_minutes)
+        default_note_map = {
+            "出席": "手動補録（出席）",
+            "遅刻": "手動補録（遅刻）",
+            "早退": "手動補録（早退）",
+            "欠席": "手動補録（欠席）",
+            "公欠": "手動補録（公欠）",
+        }
+        note = note or default_note_map[status]
+        timestamp = now_iso()
+        checkin_at = timestamp if status in {"出席", "遅刻", "早退"} else None
+        checkout_at = timestamp if status == "早退" else None
+        conn = connect()
+        cur = conn.cursor()
+        existing = cur.execute(
+            """
+            select *
+            from student_attendance_records
+            where student_id = ? and class_date = ? and period_label = ?
+            order by created_at desc
+            limit 1
+            """,
+            (student_id, session["class_date"], session["period_label"]),
+        ).fetchone()
+        if existing:
+            cur.execute(
+                """
+                update student_attendance_records
+                set status = ?,
+                    attendance_minutes = ?,
+                    scheduled_minutes = ?,
+                    note = ?,
+                    source_session_id = ?,
+                    checkin_at = ?,
+                    checkout_at = ?,
+                    late_minutes = ?,
+                    early_leave_minutes = ?
+                where id = ?
+                """,
+                (
+                    status,
+                    attendance_minutes,
+                    scheduled_minutes,
+                    note,
+                    session_id,
+                    checkin_at,
+                    checkout_at,
+                    late_minutes,
+                    early_leave_minutes,
+                    existing["id"],
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                insert into student_attendance_records
+                (id, student_id, class_date, period_label, status, attendance_minutes, scheduled_minutes, note, created_at, source_session_id, checkin_at, checkout_at, late_minutes, early_leave_minutes)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    new_id(),
+                    student_id,
+                    session["class_date"],
+                    session["period_label"],
+                    status,
+                    attendance_minutes,
+                    scheduled_minutes,
+                    note,
+                    timestamp,
+                    session_id,
+                    checkin_at,
+                    checkout_at,
+                    late_minutes,
+                    early_leave_minutes,
+                ),
+            )
+        write_audit(
+            cur,
+            "attendance.manual_update",
+            "student",
+            student_id,
+            f"{student.get('name') or student.get('student_no') or student_id} の {session['class_date']} {session['period_label']} を {status} に手動更新しました。",
+        )
+        conn.commit()
+        conn.close()
+        return self.json(self.attendance_checkin_session_detail(session_id))
 
     def consultation_records_for_student(self, student_id: str) -> list[dict]:
         return rows(
@@ -2219,6 +3370,59 @@ class Handler(BaseHTTPRequestHandler):
             from student_consultation_records
             where student_id = ?
             order by meeting_date desc, created_at desc
+            limit 20
+            """,
+            (student_id,),
+        )
+
+    def create_student_consultation_record(self, student_id: str, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_edit", "面談記録の追加は staff / 入管担当 / manager のみ実行できます。"):
+            return
+        student = row("select * from students where id = ?", (student_id,))
+        if not student:
+            return self.json_error("NOT_FOUND", "学生が見つかりません。", status=404)
+        meeting_date = (body.get("meeting_date") or "").strip()
+        staff_name = (body.get("staff_name") or "").strip()
+        category = (body.get("category") or "").strip()
+        summary = (body.get("summary") or "").strip()
+        next_meeting_date = (body.get("next_meeting_date") or "").strip()
+        next_action = (body.get("next_action") or "").strip()
+        if not meeting_date or not staff_name or not category or not summary:
+            return self.json_error("VALIDATION_ERROR", "面談日、担当者、区分、概要を入力してください。", status=422)
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            insert into student_consultation_records
+            (id, student_id, meeting_date, staff_name, category, summary, next_meeting_date, next_action, created_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (new_id(), student_id, meeting_date, staff_name, category, summary, next_meeting_date, next_action, now_iso()),
+        )
+        write_audit(cur, "student.consultation_create", "student", student_id, f"{student.get('name') or student.get('student_no') or student_id} の面談記録を追加しました。")
+        conn.commit()
+        conn.close()
+        return self.json({"ok": True, "detail": self.student_detail(student_id)})
+
+    def profile_change_requests_for_student(self, student_id: str) -> list[dict]:
+        return rows(
+            """
+            select *
+            from student_profile_change_requests
+            where student_id = ?
+            order by created_at desc
+            limit 20
+            """,
+            (student_id,),
+        )
+
+    def residence_change_requests_for_student(self, student_id: str) -> list[dict]:
+        return rows(
+            """
+            select *
+            from student_residence_change_requests
+            where student_id = ?
+            order by created_at desc
             limit 20
             """,
             (student_id,),
@@ -2350,6 +3554,8 @@ class Handler(BaseHTTPRequestHandler):
         homeroom_chat = self.homeroom_messages_for_student(student["id"])
         homework = self.homework_overview_for_student(student["id"], student.get("class_name") or "")
         settings = self.student_portal_settings(student["id"])
+        profile_change_requests = self.profile_change_requests_for_student(student["id"])
+        residence_change_requests = self.residence_change_requests_for_student(student["id"])
         return {
             "ok": True,
             "student": student,
@@ -2379,6 +3585,8 @@ class Handler(BaseHTTPRequestHandler):
             },
             "homework": homework,
             "settings": settings,
+            "profile_change_requests": profile_change_requests,
+            "residence_change_requests": residence_change_requests,
             "certificate_requests": requests,
             "certificate_types": ["出席率証明書", "成績証明書", "修了証明書"],
         }
@@ -2415,6 +3623,72 @@ class Handler(BaseHTTPRequestHandler):
             (session_token, now_iso()),
         )
         return session_row
+
+    def issue_staff_session(self, staff_id: str) -> str:
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute("delete from staff_sessions where staff_id = ?", (staff_id,))
+        session_token = secrets.token_urlsafe(32)
+        now = datetime.now()
+        expires_at = now.replace(hour=23, minute=59, second=59, microsecond=0).isoformat()
+        cur.execute(
+            """
+            insert into staff_sessions
+            (id, staff_id, session_token, created_at, expires_at)
+            values (?, ?, ?, ?, ?)
+            """,
+            (new_id(), staff_id, session_token, now.replace(microsecond=0).isoformat(), expires_at),
+        )
+        conn.commit()
+        conn.close()
+        return session_token
+
+    def staff_by_session_token(self, session_token: str) -> dict | None:
+        if not session_token:
+            return None
+        return row(
+            """
+            select sa.*
+            from staff_sessions ss
+            left join staff_accounts sa on sa.id = ss.staff_id
+            where ss.session_token = ? and ss.expires_at >= ? and ifnull(sa.active, 1) = 1
+            """,
+            (session_token, now_iso()),
+        )
+
+    def current_staff(self) -> dict | None:
+        session_token = (self.headers.get("x-staff-session") or "").strip()
+        return self.staff_by_session_token(session_token)
+
+    def require_staff_session(self) -> dict | None:
+        staff = self.current_staff()
+        if not staff:
+            self.json_error("AUTH_REQUIRED", "管理画面にログインしてください。", status=401)
+            return None
+        return staff
+
+    def staff_has_permission(self, staff: dict | None, permission: str) -> bool:
+        if not staff:
+            return False
+        return permission in STAFF_ROLE_PERMISSIONS.get(staff.get("role") or "", set())
+
+    def require_staff_permission(self, staff: dict | None, permission: str, message: str = "") -> bool:
+        if self.staff_has_permission(staff, permission):
+            return True
+        self.json_error("FORBIDDEN", message or "この操作を行う権限がありません。", status=403)
+        return False
+
+    def staff_session_payload(self, staff: dict) -> dict:
+        permissions = sorted(STAFF_ROLE_PERMISSIONS.get(staff.get("role") or "", set()))
+        return {
+            "staff": {
+                "id": staff["id"],
+                "login_id": staff["login_id"],
+                "display_name": staff["display_name"],
+                "role": staff["role"],
+                "permissions": permissions,
+            }
+        }
 
     def lookup_student_for_portal(self, student_no: str, birth_date: str) -> dict | None:
         if not student_no or not birth_date:
@@ -2520,6 +3794,27 @@ class Handler(BaseHTTPRequestHandler):
         conn.close()
         return self.json({"ok": True})
 
+    def staff_login(self, body: dict) -> None:
+        login_id = (body.get("login_id") or "").strip()
+        password = body.get("password") or ""
+        if not login_id or not password:
+            return self.json_error("VALIDATION_ERROR", "ログインIDとパスワードを入力してください。", status=422)
+        staff = row("select * from staff_accounts where login_id = ?", (login_id,))
+        if not staff or not verify_password(password, staff.get("password_hash") or ""):
+            return self.json_error("AUTH_FAILED", "ログインIDまたはパスワードが正しくありません。", status=401)
+        if not int(staff.get("active", 1) or 0):
+            return self.json_error("AUTH_DISABLED", "このアカウントは停止中です。manager に確認してください。", status=403)
+        session_token = self.issue_staff_session(staff["id"])
+        payload = self.staff_session_payload(staff)
+        payload["session_token"] = session_token
+        return self.json(payload)
+
+    def staff_session(self) -> None:
+        staff = self.require_staff_session()
+        if not staff:
+            return
+        return self.json(self.staff_session_payload(staff))
+
     def public_student_login(self, body: dict) -> None:
         login_id = (body.get("login_id") or "").strip()
         password = body.get("password") or ""
@@ -2583,6 +3878,8 @@ class Handler(BaseHTTPRequestHandler):
         }
 
     def student_portal_admin(self) -> dict:
+        if not self.require_staff_permission(self.current_staff(), "student_portal_review", "学生連携の確認は staff / 入管担当 / manager のみ利用できます。"):
+            return
         leave_requests = rows(
             """
             select
@@ -2614,6 +3911,34 @@ class Handler(BaseHTTPRequestHandler):
             order by hs.submitted_at desc
             """
         )
+        profile_change_requests = rows(
+            """
+            select
+              pr.*,
+              s.student_no,
+              s.name as student_name,
+              s.class_name
+            from student_profile_change_requests pr
+            left join students s on s.id = pr.student_id
+            order by
+              case when pr.status = '申請中' then 0 else 1 end,
+              pr.created_at desc
+            """
+        )
+        residence_change_requests = rows(
+            """
+            select
+              rr.*,
+              s.student_no,
+              s.name as student_name,
+              s.class_name
+            from student_residence_change_requests rr
+            left join students s on s.id = rr.student_id
+            order by
+              case when rr.status = '申請中' then 0 else 1 end,
+              rr.created_at desc
+            """
+        )
         bulletin_posts = rows(
             """
             select *
@@ -2633,11 +3958,15 @@ class Handler(BaseHTTPRequestHandler):
         return {
             "summary": {
                 "leave_pending_count": sum(1 for item in leave_requests if item["status"] == "申請中"),
+                "profile_change_pending_count": sum(1 for item in profile_change_requests if item["status"] == "申請中"),
+                "residence_change_pending_count": sum(1 for item in residence_change_requests if item["status"] == "申請中"),
                 "homework_submission_count": len(homework_submissions),
                 "bulletin_count": len(bulletin_posts),
                 "group_message_count": len(recent_group_messages),
             },
             "leave_requests": leave_requests,
+            "profile_change_requests": profile_change_requests,
+            "residence_change_requests": residence_change_requests,
             "homework_submissions": homework_submissions,
             "bulletin_posts": bulletin_posts,
             "recent_group_messages": recent_group_messages,
@@ -2647,6 +3976,15 @@ class Handler(BaseHTTPRequestHandler):
         text = (period_label or "").strip()
         if not text:
             return 180
+        single_periods = {
+            "1限": 45,
+            "2限": 45,
+            "3限": 45,
+            "4限": 45,
+            "5限": 45,
+        }
+        if text in single_periods:
+            return single_periods[text]
         if text == "1-2限":
             return 90
         if text == "3-4限":
@@ -2663,6 +4001,22 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 pass
         return 180
+
+    def period_time_range(self, period_label: str) -> tuple[str, str]:
+        mapping = {
+            "1限": ("09:10", "09:55"),
+            "2限": ("09:55", "10:40"),
+            "3限": ("10:50", "11:35"),
+            "4限": ("11:35", "12:20"),
+            "5限": ("13:10", "13:55"),
+            "1-2限": ("09:10", "10:40"),
+            "3-4限": ("10:50", "12:20"),
+            "1-4限": ("09:10", "12:20"),
+        }
+        return mapping.get((period_label or "").strip(), ("09:10", "12:20"))
+
+    def session_datetime(self, class_date: str, hhmm: str) -> datetime:
+        return datetime.strptime(f"{class_date} {hhmm}", "%Y-%m-%d %H:%M")
 
     def receipt_config(self) -> dict:
         template = row("select * from receipt_templates where status = 'active' order by created_at desc limit 1")
@@ -3218,6 +4572,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"ok": True, "overview": self.annual_results_overview()})
 
     def update_student(self, student_id: str, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_edit", "学生主档案の更新は staff / 入管担当 / manager のみ実行できます。"):
+            return
         student = row("select * from students where id = ?", (student_id,))
         if not student:
             return self.json_error("NOT_FOUND", "学生が見つかりません。", status=404)
@@ -3233,7 +4589,7 @@ class Handler(BaseHTTPRequestHandler):
             set student_no = ?, name = ?, nationality = ?, status = ?, class_name = ?,
                 residence_card_no = ?, residence_expiry = ?, attendance_rate = ?, phone = ?,
                 address_japan = ?, passport_no = ?, birth_date = ?, residence_status = ?,
-                admission_date = ?, emergency_contact = ?, notes = ?
+                admission_date = ?, emergency_contact = ?, advisor_name = ?, office_memo = ?, guardian_contact_memo = ?, agent_contact_memo = ?, notes = ?
             where id = ?
             """,
             (
@@ -3252,6 +4608,10 @@ class Handler(BaseHTTPRequestHandler):
                 body.get("residence_status", "").strip(),
                 body.get("admission_date", "").strip(),
                 body.get("emergency_contact", "").strip(),
+                body.get("advisor_name", "").strip(),
+                body.get("office_memo", "").strip(),
+                body.get("guardian_contact_memo", "").strip(),
+                body.get("agent_contact_memo", "").strip(),
                 body.get("notes", "").strip(),
                 student_id,
             ),
@@ -3265,7 +4625,18 @@ class Handler(BaseHTTPRequestHandler):
         student_id = (body.get("student_id") or "").strip()
         certificate_type = (body.get("certificate_type") or "").strip()
         purpose = (body.get("purpose") or "").strip()
+        default_delivery_method = {
+            "出席率証明書": "電子",
+            "成績証明書": "窓口受取",
+            "修了証明書": "窓口受取",
+        }
+        delivery_method = (body.get("delivery_method") or default_delivery_method.get(certificate_type, "電子")).strip()
+        preferred_pickup_date = (body.get("preferred_pickup_date") or "").strip()
+        counter_note = (body.get("counter_note") or "").strip()
         requested_by = (body.get("requested_by") or "student").strip()
+        if requested_by != "student":
+            if not self.require_staff_permission(self.current_staff(), "certificate_issue", "証明書申請の登録は staff / 入管担当 / manager のみ実行できます。"):
+                return
         try:
             copies = int(body.get("copies") or 1)
         except (TypeError, ValueError):
@@ -3274,22 +4645,43 @@ class Handler(BaseHTTPRequestHandler):
         if not student:
             return self.json_error("NOT_FOUND", "学生が見つかりません。", status=404)
         allowed = {"出席率証明書", "成績証明書", "修了証明書"}
+        allowed_delivery_methods = {"電子", "窓口受取", "電子+窓口"}
         if certificate_type not in allowed:
             return self.json_error("VALIDATION_ERROR", "証明書種別が不正です。", {"allowed": sorted(allowed)}, 422)
+        if delivery_method not in allowed_delivery_methods:
+            return self.json_error("VALIDATION_ERROR", "受取方法が不正です。", {"allowed": sorted(allowed_delivery_methods)}, 422)
         if copies < 1 or copies > 10:
             return self.json_error("VALIDATION_ERROR", "部数は 1 から 10 の間で入力してください。", status=422)
+        pickup_status = "窓口受取待ち" if delivery_method in {"窓口受取", "電子+窓口"} else "電子発行待ち"
         conn = connect()
         cur = conn.cursor()
         request_id = new_id()
         cur.execute(
             """
             insert into certificate_requests
-            (id, student_id, certificate_type, copies, purpose, requested_by, status, issued_by, requested_at, approved_at, issued_at, created_at)
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, student_id, certificate_type, copies, purpose, delivery_method, pickup_status, preferred_pickup_date, counter_note, requested_by, status, issued_by, requested_at, approved_at, issued_at, created_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (request_id, student_id, certificate_type, copies, purpose, requested_by, "申請中", "", now_iso(), None, None, now_iso()),
+            (
+                request_id,
+                student_id,
+                certificate_type,
+                copies,
+                purpose,
+                delivery_method,
+                pickup_status,
+                preferred_pickup_date,
+                counter_note,
+                requested_by,
+                "申請中",
+                "",
+                now_iso(),
+                None,
+                None,
+                now_iso(),
+            ),
         )
-        write_audit(cur, "certificate.request", "student", student_id, f"{certificate_type} の申請を受け付けました。")
+        write_audit(cur, "certificate.request", "student", student_id, f"{certificate_type} の申請を受け付けました。受取方法: {delivery_method}")
         conn.commit()
         conn.close()
         return self.json({"ok": True, "request": row("select * from certificate_requests where id = ?", (request_id,))})
@@ -3304,9 +4696,41 @@ class Handler(BaseHTTPRequestHandler):
             "certificate_type": body.get("certificate_type"),
             "purpose": body.get("purpose"),
             "copies": body.get("copies"),
+            "delivery_method": body.get("delivery_method"),
+            "preferred_pickup_date": body.get("preferred_pickup_date"),
+            "counter_note": body.get("counter_note"),
             "requested_by": "student",
         }
         self.create_certificate_request(payload)
+
+    def track_public_certificate_download(self, body: dict) -> None:
+        session_token = (body.get("session_token") or "").strip()
+        request_id = (body.get("request_id") or "").strip()
+        student = self.student_by_session_token(session_token)
+        if not student:
+            return self.json_error("AUTH_FAILED", "ログイン状態を確認できません。もう一度ログインしてください。", status=401)
+        request = row("select * from certificate_requests where id = ? and student_id = ?", (request_id, student["id"]))
+        if not request:
+            return self.json_error("NOT_FOUND", "証明書申請が見つかりません。", status=404)
+        if request.get("delivery_method") not in {"電子", "電子+窓口"}:
+            return self.json_error("STATUS_INVALID", "電子版ダウンロード対象ではありません。", status=409)
+        if request.get("status") != "発行済":
+            return self.json_error("STATUS_INVALID", "まだ発行されていません。", status=409)
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            update certificate_requests
+            set download_count = coalesce(download_count, 0) + 1,
+                last_downloaded_at = ?
+            where id = ?
+            """,
+            (now_iso(), request_id),
+        )
+        write_audit(cur, "certificate.download", "student", student["id"], f"{request['certificate_type']} の電子版をダウンロードしました。")
+        conn.commit()
+        conn.close()
+        return self.json({"ok": True})
 
     def create_public_leave_request(self, body: dict) -> None:
         session_token = (body.get("session_token") or "").strip()
@@ -3361,6 +4785,491 @@ class Handler(BaseHTTPRequestHandler):
         conn.close()
         return self.json({"ok": True, "settings": settings})
 
+    def create_public_profile_change_request(self, body: dict) -> None:
+        session_token = (body.get("session_token") or "").strip()
+        student = self.student_by_session_token(session_token)
+        if not student:
+            return self.json_error("AUTH_FAILED", "ログイン状態を確認できません。もう一度ログインしてください。", status=401)
+        requested_phone = (body.get("requested_phone") or "").strip()
+        requested_address_japan = (body.get("requested_address_japan") or "").strip()
+        requested_emergency_contact = (body.get("requested_emergency_contact") or "").strip()
+        reason = (body.get("reason") or "").strip()
+        if not any([requested_phone, requested_address_japan, requested_emergency_contact]):
+            return self.json_error("VALIDATION_ERROR", "変更したい項目を 1 つ以上入力してください。", status=422)
+        if (
+            requested_phone == (student.get("phone") or "").strip()
+            and requested_address_japan == (student.get("address_japan") or "").strip()
+            and requested_emergency_contact == (student.get("emergency_contact") or "").strip()
+        ):
+            return self.json_error("VALIDATION_ERROR", "現在の登録内容と同じです。変更内容を入力してください。", status=422)
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            insert into student_profile_change_requests
+            (id, student_id, current_phone, requested_phone, current_address_japan, requested_address_japan,
+             current_emergency_contact, requested_emergency_contact, reason, status, reviewed_note, created_at, reviewed_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                new_id(),
+                student["id"],
+                (student.get("phone") or "").strip(),
+                requested_phone,
+                (student.get("address_japan") or "").strip(),
+                requested_address_japan,
+                (student.get("emergency_contact") or "").strip(),
+                requested_emergency_contact,
+                reason,
+                "申請中",
+                "",
+                now_iso(),
+                None,
+            ),
+        )
+        write_audit(cur, "student.profile_change_request", "student", student["id"], "個人情報変更申請を受け付けました。")
+        conn.commit()
+        conn.close()
+        payload = self.build_student_portal_payload(row("select * from students where id = ?", (student["id"],)))
+        payload["session_token"] = session_token
+        payload["login_id"] = student.get("student_no") or ""
+        return self.json(payload)
+
+    def create_public_attendance_checkin(self, body: dict) -> None:
+        session_token = (body.get("session_token") or "").strip()
+        access_code = (body.get("access_code") or "").strip().upper()
+        student = self.student_by_session_token(session_token)
+        if not student:
+            return self.json_error("AUTH_FAILED", "ログイン状態を確認できません。もう一度ログインしてください。", status=401)
+        if not access_code:
+            return self.json_error("VALIDATION_ERROR", "出席コードを入力してください。", status=422)
+        session = row(
+            """
+            select *
+            from attendance_checkin_sessions
+            where access_code = ? and status = 'active' and expires_at >= ?
+            """,
+            (access_code, now_iso()),
+        )
+        if not session:
+            return self.json_error("NOT_FOUND", "有効な出席コードが見つかりません。", status=404)
+        if (session.get("class_name") or "").strip() != (student.get("class_name") or "").strip():
+            return self.json_error("FORBIDDEN", "自分のクラス以外の出席コードです。", status=403)
+        start_dt = self.session_datetime(session["class_date"], session.get("start_time") or self.period_time_range(session["period_label"])[0])
+        now_dt = datetime.now()
+        delta_minutes = max(0, int((now_dt - start_dt).total_seconds() // 60))
+        late_grace_minutes = int(session.get("late_grace_minutes") or 5)
+        absent_cutoff_minutes = int(session.get("absent_cutoff_minutes") or 5)
+        attendance_status = "出席"
+        attendance_note = "QR出席"
+        late_minutes = 0
+        attendance_minutes = int(session.get("scheduled_minutes") or 0)
+        if delta_minutes > absent_cutoff_minutes:
+            attendance_status = "欠席"
+            attendance_note = "QR打刻（遅延）"
+            attendance_minutes = 0
+        elif delta_minutes >= 1:
+            attendance_status = "遅刻"
+            attendance_note = "QR出席（遅刻）"
+            late_minutes = delta_minutes
+            attendance_minutes = max(0, int(session.get("scheduled_minutes") or 0) - late_minutes)
+        conn = connect()
+        cur = conn.cursor()
+        existing = cur.execute(
+            """
+            select * from student_attendance_records
+            where student_id = ? and class_date = ? and period_label = ?
+            order by created_at desc
+            limit 1
+            """,
+            (student["id"], session["class_date"], session["period_label"]),
+        ).fetchone()
+        if existing:
+            cur.execute(
+                """
+                update student_attendance_records
+                set status = ?,
+                    attendance_minutes = ?,
+                    scheduled_minutes = ?,
+                    note = ?,
+                    source_session_id = ?,
+                    checkin_at = ?,
+                    late_minutes = ?,
+                    early_leave_minutes = ?
+                where id = ?
+                """,
+                (
+                    attendance_status,
+                    attendance_minutes,
+                    int(session.get("scheduled_minutes") or 0),
+                    attendance_note,
+                    session["id"],
+                    now_iso(),
+                    late_minutes,
+                    0,
+                    existing["id"],
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                insert into student_attendance_records
+                (id, student_id, class_date, period_label, status, attendance_minutes, scheduled_minutes, note, created_at, source_session_id, checkin_at, late_minutes, early_leave_minutes)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    new_id(),
+                    student["id"],
+                    session["class_date"],
+                    session["period_label"],
+                    attendance_status,
+                    attendance_minutes,
+                    int(session.get("scheduled_minutes") or 0),
+                    attendance_note,
+                    now_iso(),
+                    session["id"],
+                    now_iso(),
+                    late_minutes,
+                    0,
+                ),
+            )
+        write_audit(cur, "student.attendance_checkin", "student", student["id"], f"QR出席コード {access_code} で出席登録しました。")
+        conn.commit()
+        conn.close()
+        payload = self.build_student_portal_payload(row("select * from students where id = ?", (student["id"],)))
+        payload["session_token"] = session_token
+        payload["login_id"] = student.get("student_no") or ""
+        payload["checkin_message"] = f"{session['class_date']} / {session['period_label']} を {attendance_status} で登録しました。"
+        return self.json(payload)
+
+    def create_public_attendance_checkout(self, body: dict) -> None:
+        session_token = (body.get("session_token") or "").strip()
+        access_code = (body.get("access_code") or "").strip().upper()
+        student = self.student_by_session_token(session_token)
+        if not student:
+            return self.json_error("AUTH_FAILED", "ログイン状態を確認できません。もう一度ログインしてください。", status=401)
+        if not access_code:
+            return self.json_error("VALIDATION_ERROR", "退室コードを入力してください。", status=422)
+        session = row(
+            """
+            select *
+            from attendance_checkin_sessions
+            where checkout_access_code = ? and status = 'active'
+            """,
+            (access_code,),
+        )
+        if not session:
+            return self.json_error("NOT_FOUND", "有効な退室コードが見つかりません。", status=404)
+        if (session.get("class_name") or "").strip() != (student.get("class_name") or "").strip():
+            return self.json_error("FORBIDDEN", "自分のクラス以外の退室コードです。", status=403)
+        conn = connect()
+        cur = conn.cursor()
+        record = cur.execute(
+            """
+            select *
+            from student_attendance_records
+            where student_id = ? and source_session_id = ?
+            order by created_at desc
+            limit 1
+            """,
+            (student["id"], session["id"]),
+        ).fetchone()
+        if not record:
+            conn.close()
+            return self.json_error("VALIDATION_ERROR", "先に入室コードで出席登録してください。", status=422)
+        end_dt = self.session_datetime(session["class_date"], session.get("end_time") or self.period_time_range(session["period_label"])[1])
+        now_dt = datetime.now()
+        early_leave_minutes = max(0, int((end_dt - now_dt).total_seconds() // 60))
+        updated_status = record["status"]
+        updated_note = record["note"] or "QR出席"
+        scheduled_minutes = int(record["scheduled_minutes"] or 0)
+        if early_leave_minutes > 0 and record["status"] in {"出席", "遅刻"}:
+            updated_status = "早退"
+            updated_note = "QR退室（早退）"
+        if early_leave_minutes > 0:
+            current_minutes = int(record["attendance_minutes"] or 0)
+            current_minutes = max(0, current_minutes - early_leave_minutes)
+        else:
+            current_minutes = int(record["attendance_minutes"] or 0)
+        cur.execute(
+            """
+            update student_attendance_records
+            set status = ?,
+                note = ?,
+                attendance_minutes = ?,
+                checkout_at = ?,
+                early_leave_minutes = ?
+            where id = ?
+            """,
+            (
+                updated_status,
+                updated_note,
+                min(current_minutes, scheduled_minutes),
+                now_iso(),
+                early_leave_minutes,
+                record["id"],
+            ),
+        )
+        write_audit(cur, "student.attendance_checkout", "student", student["id"], f"QR退室コード {access_code} で退室登録しました。")
+        conn.commit()
+        conn.close()
+        payload = self.build_student_portal_payload(row("select * from students where id = ?", (student["id"],)))
+        payload["session_token"] = session_token
+        payload["login_id"] = student.get("student_no") or ""
+        payload["checkout_message"] = f"{session['class_date']} / {session['period_label']} の退室を登録しました。"
+        return self.json(payload)
+
+    def create_public_residence_change_request(self, body: dict) -> None:
+        session_token = (body.get("session_token") or "").strip()
+        student = self.student_by_session_token(session_token)
+        if not student:
+            return self.json_error("AUTH_FAILED", "ログイン状態を確認できません。もう一度ログインしてください。", status=401)
+        requested_residence_status = (body.get("requested_residence_status") or "").strip()
+        requested_residence_card_no = (body.get("requested_residence_card_no") or "").strip()
+        requested_residence_expiry = (body.get("requested_residence_expiry") or "").strip()
+        requested_passport_no = (body.get("requested_passport_no") or "").strip()
+        reason = (body.get("reason") or "").strip()
+        if not any([requested_residence_status, requested_residence_card_no, requested_residence_expiry, requested_passport_no]):
+            return self.json_error("VALIDATION_ERROR", "変更したい在留情報を 1 つ以上入力してください。", status=422)
+        if (
+            requested_residence_status == (student.get("residence_status") or "").strip()
+            and requested_residence_card_no == (student.get("residence_card_no") or "").strip()
+            and requested_residence_expiry == (student.get("residence_expiry") or "").strip()
+            and requested_passport_no == (student.get("passport_no") or "").strip()
+        ):
+            return self.json_error("VALIDATION_ERROR", "現在の登録内容と同じです。変更内容を入力してください。", status=422)
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            insert into student_residence_change_requests
+            (id, student_id, current_residence_status, requested_residence_status, current_residence_card_no, requested_residence_card_no,
+             current_residence_expiry, requested_residence_expiry, current_passport_no, requested_passport_no, reason, status, reviewed_note, created_at, reviewed_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                new_id(),
+                student["id"],
+                (student.get("residence_status") or "").strip(),
+                requested_residence_status,
+                (student.get("residence_card_no") or "").strip(),
+                requested_residence_card_no,
+                (student.get("residence_expiry") or "").strip(),
+                requested_residence_expiry,
+                (student.get("passport_no") or "").strip(),
+                requested_passport_no,
+                reason,
+                "申請中",
+                "",
+                now_iso(),
+                None,
+            ),
+        )
+        write_audit(cur, "student.residence_change_request", "student", student["id"], "在留情報変更申請を受け付けました。")
+        conn.commit()
+        conn.close()
+        payload = self.build_student_portal_payload(row("select * from students where id = ?", (student["id"],)))
+        payload["session_token"] = session_token
+        payload["login_id"] = student.get("student_no") or ""
+        return self.json(payload)
+
+    def create_public_residence_change_request_upload(self) -> None:
+        form = self.read_multipart_form()
+        session_token = (form.get("session_token", {}) or {}).get("value", "").strip()
+        student = self.student_by_session_token(session_token)
+        if not student:
+            return self.json_error("AUTH_FAILED", "ログイン状態を確認できません。もう一度ログインしてください。", status=401)
+        requested_residence_status = (form.get("requested_residence_status", {}) or {}).get("value", "").strip()
+        requested_residence_card_no = (form.get("requested_residence_card_no", {}) or {}).get("value", "").strip()
+        requested_residence_expiry = (form.get("requested_residence_expiry", {}) or {}).get("value", "").strip()
+        requested_passport_no = (form.get("requested_passport_no", {}) or {}).get("value", "").strip()
+        reason = (form.get("reason", {}) or {}).get("value", "").strip()
+        residence_card_upload = form.get("residence_card_file")
+        passport_upload = form.get("passport_file")
+        if not any([requested_residence_status, requested_residence_card_no, requested_residence_expiry, requested_passport_no]):
+            return self.json_error("VALIDATION_ERROR", "変更したい在留情報を 1 つ以上入力してください。", status=422)
+        if (
+            requested_residence_status == (student.get("residence_status") or "").strip()
+            and requested_residence_card_no == (student.get("residence_card_no") or "").strip()
+            and requested_residence_expiry == (student.get("residence_expiry") or "").strip()
+            and requested_passport_no == (student.get("passport_no") or "").strip()
+        ):
+            return self.json_error("VALIDATION_ERROR", "現在の登録内容と同じです。変更内容を入力してください。", status=422)
+        residence_dir = UPLOAD_DIR / "student_residence_changes"
+        residence_dir.mkdir(parents=True, exist_ok=True)
+
+        def store_upload(upload: dict | None) -> tuple[str, str]:
+            if not upload or not upload.get("filename"):
+                return "", ""
+            filename = Path(upload["filename"]).name
+            stored_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:8]}-{filename}"
+            destination = residence_dir / stored_name
+            destination.write_bytes(upload.get("content") or b"")
+            return filename, str(destination)
+
+        residence_card_file_name, residence_card_file_path = store_upload(residence_card_upload)
+        passport_file_name, passport_file_path = store_upload(passport_upload)
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            insert into student_residence_change_requests
+            (id, student_id, current_residence_status, requested_residence_status, current_residence_card_no, requested_residence_card_no,
+             current_residence_expiry, requested_residence_expiry, current_passport_no, requested_passport_no,
+             residence_card_file_name, residence_card_file_path, passport_file_name, passport_file_path, reason, status, reviewed_note, created_at, reviewed_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                new_id(),
+                student["id"],
+                (student.get("residence_status") or "").strip(),
+                requested_residence_status,
+                (student.get("residence_card_no") or "").strip(),
+                requested_residence_card_no,
+                (student.get("residence_expiry") or "").strip(),
+                requested_residence_expiry,
+                (student.get("passport_no") or "").strip(),
+                requested_passport_no,
+                residence_card_file_name,
+                residence_card_file_path,
+                passport_file_name,
+                passport_file_path,
+                reason,
+                "申請中",
+                "",
+                now_iso(),
+                None,
+            ),
+        )
+        write_audit(cur, "student.residence_change_request", "student", student["id"], "在留情報変更申請を受け付けました。")
+        conn.commit()
+        conn.close()
+        payload = self.build_student_portal_payload(row("select * from students where id = ?", (student["id"],)))
+        payload["session_token"] = session_token
+        payload["login_id"] = student.get("student_no") or ""
+        return self.json(payload)
+
+    def create_attendance_checkin_session(self, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "attendance_session_manage", "QR出席セッションの作成は staff / 入管担当 / manager のみ実行できます。"):
+            return
+        class_name = (body.get("class_name") or "").strip()
+        class_date = (body.get("class_date") or "").strip()
+        period_label = (body.get("period_label") or "").strip()
+        created_by = (body.get("created_by") or "事務局").strip()
+        start_time = (body.get("start_time") or "").strip()
+        end_time = (body.get("end_time") or "").strip()
+        if not start_time or not end_time:
+            default_start, default_end = self.period_time_range(period_label)
+            start_time = start_time or default_start
+            end_time = end_time or default_end
+        if not class_name or not class_date or not period_label:
+            return self.json_error("VALIDATION_ERROR", "クラス・日付・時限を入力してください。", status=422)
+        access_code = secrets.token_hex(3).upper()
+        checkout_access_code = secrets.token_hex(3).upper()
+        expires_at = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0).isoformat()
+        scheduled_minutes = self.period_minutes(period_label)
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            insert into attendance_checkin_sessions
+            (id, class_name, class_date, period_label, scheduled_minutes, access_code, status, created_by, created_at, expires_at, start_time, end_time, late_grace_minutes, absent_cutoff_minutes, checkout_access_code)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                new_id(),
+                class_name,
+                class_date,
+                period_label,
+                scheduled_minutes,
+                access_code,
+                "active",
+                created_by,
+                now_iso(),
+                expires_at,
+                start_time,
+                end_time,
+                5,
+                5,
+                checkout_access_code,
+            ),
+        )
+        write_audit(cur, "attendance.session_create", "class", class_name, f"{class_date} {period_label} のQR出席セッションを作成しました。")
+        conn.commit()
+        conn.close()
+        return self.json(self.attendance_checkin_sessions())
+
+    def close_attendance_checkin_session(self, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "attendance_session_manage", "QR出席セッションの終了は staff / 入管担当 / manager のみ実行できます。"):
+            return
+        session_id = (body.get("session_id") or "").strip()
+        if not session_id:
+            return self.json_error("VALIDATION_ERROR", "終了する出席セッションを指定してください。", status=422)
+        conn = connect()
+        cur = conn.cursor()
+        session = cur.execute("select * from attendance_checkin_sessions where id = ?", (session_id,)).fetchone()
+        if not session:
+            conn.close()
+            return self.json_error("NOT_FOUND", "出席セッションが見つかりません。", status=404)
+        missing_students = self.missing_students_for_session(session_id)
+        absent_created = 0
+        for student in missing_students:
+            existing = cur.execute(
+                """
+                select id
+                from student_attendance_records
+                where student_id = ?
+                  and class_date = ?
+                  and period_label = ?
+                order by created_at desc
+                limit 1
+                """,
+                (student["id"], session["class_date"], session["period_label"]),
+            ).fetchone()
+            if existing:
+                continue
+            cur.execute(
+                """
+                insert into student_attendance_records
+                (id, student_id, class_date, period_label, status, attendance_minutes, scheduled_minutes, note, created_at, source_session_id, late_minutes, early_leave_minutes)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    new_id(),
+                    student["id"],
+                    session["class_date"],
+                    session["period_label"],
+                    "欠席",
+                    0,
+                    int(session["scheduled_minutes"] or 0),
+                    "QR未打刻",
+                    now_iso(),
+                    session_id,
+                    0,
+                    0,
+                ),
+            )
+            absent_created += 1
+        cur.execute(
+            """
+            update attendance_checkin_sessions
+            set status = 'closed',
+                expires_at = ?
+            where id = ?
+            """,
+            (now_iso(), session_id),
+        )
+        write_audit(
+            cur,
+            "attendance.session_close",
+            "class",
+            session["class_name"],
+            f"{session['class_date']} {session['period_label']} のQR出席セッションを終了しました。未打刻 {absent_created} 名を欠席登録しました。",
+        )
+        conn.commit()
+        conn.close()
+        return self.json(self.attendance_checkin_sessions())
+
     def create_public_group_message(self, body: dict) -> None:
         session_token = (body.get("session_token") or "").strip()
         student = self.student_by_session_token(session_token)
@@ -3409,6 +5318,8 @@ class Handler(BaseHTTPRequestHandler):
         assignment = row("select * from student_homework_assignments where id = ?", (assignment_id,))
         if not assignment:
             return self.json_error("NOT_FOUND", "課題が見つかりません。", status=404)
+        if (assignment.get("class_name") or "").strip() != (student.get("class_name") or "").strip():
+            return self.json_error("FORBIDDEN", "自分のクラス以外の課題は提出できません。", status=403)
         upload = form.get("file")
         file_name = ""
         file_path = ""
@@ -3450,6 +5361,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"ok": True})
 
     def approve_certificate_request(self, request_id: str) -> None:
+        if not self.require_staff_permission(self.current_staff(), "certificate_issue", "証明書申請の承認は staff / 入管担当 / manager のみ実行できます。"):
+            return
         request = row("select * from certificate_requests where id = ?", (request_id,))
         if not request:
             return self.json_error("NOT_FOUND", "証明書申請が見つかりません。", status=404)
@@ -3457,7 +5370,20 @@ class Handler(BaseHTTPRequestHandler):
             return self.json_error("STATUS_INVALID", "申請中の証明書のみ承認できます。", status=409)
         conn = connect()
         cur = conn.cursor()
-        cur.execute("update certificate_requests set status = '承認済', approved_at = ?, issued_by = ? where id = ?", (now_iso(), "事務局 山田", request_id))
+        cur.execute(
+            """
+            update certificate_requests
+            set status = '承認済',
+                approved_at = ?,
+                issued_by = ?,
+                pickup_status = case
+                  when delivery_method in ('窓口受取', '電子+窓口') then '作成待ち'
+                  else '電子発行待ち'
+                end
+            where id = ?
+            """,
+            (now_iso(), "事務局 山田", request_id),
+        )
         write_audit(cur, "certificate.approve", "student", request["student_id"], f"{request['certificate_type']} を承認しました。")
         conn.commit()
         conn.close()
@@ -3515,6 +5441,8 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def issue_certificate_request(self, request_id: str) -> None:
+        if not self.require_staff_permission(self.current_staff(), "certificate_issue", "証明書の発行は staff / 入管担当 / manager のみ実行できます。"):
+            return
         request = row("select * from certificate_requests where id = ?", (request_id,))
         if not request:
             return self.json_error("NOT_FOUND", "証明書申請が見つかりません。", status=404)
@@ -3537,7 +5465,18 @@ class Handler(BaseHTTPRequestHandler):
             (document_id, "certificate_request", request_id, request["certificate_type"], document_no, request["certificate_type"], "generated", now_iso()),
         )
         cur.execute(
-            "update certificate_requests set status = '発行済', issued_at = ?, issued_by = ? where id = ?",
+            """
+            update certificate_requests
+            set status = '発行済',
+                issued_at = ?,
+                issued_by = ?,
+                pickup_status = case
+                  when delivery_method = '窓口受取' then '窓口受取待ち'
+                  when delivery_method = '電子+窓口' then '電子送付済・窓口受取待ち'
+                  else '電子送付済'
+                end
+            where id = ?
+            """,
             (now_iso(), "事務局 山田", request_id),
         )
         write_audit(cur, "certificate.issue", "student", request["student_id"], f"{request['certificate_type']} {document_no} を発行しました。")
@@ -3547,7 +5486,27 @@ class Handler(BaseHTTPRequestHandler):
         export = self.prewarm_certificate_export(request_id, document)
         return self.json({"ok": True, "document": document, "export": export})
 
+    def mark_certificate_pickup_received(self, request_id: str) -> None:
+        if not self.require_staff_permission(self.current_staff(), "certificate_issue", "証明書の受領管理は staff / 入管担当 / manager のみ実行できます。"):
+            return
+        request = row("select * from certificate_requests where id = ?", (request_id,))
+        if not request:
+            return self.json_error("NOT_FOUND", "証明書申請が見つかりません。", status=404)
+        if request.get("delivery_method") not in {"窓口受取", "電子+窓口"}:
+            return self.json_error("STATUS_INVALID", "窓口受取の証明書ではありません。", status=409)
+        if request["status"] != "発行済":
+            return self.json_error("STATUS_INVALID", "発行済みの証明書のみ受領済みにできます。", status=409)
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute("update certificate_requests set pickup_status = '受領済' where id = ?", (request_id,))
+        write_audit(cur, "certificate.pickup", "student", request["student_id"], f"{request['certificate_type']} を受領済みにしました。")
+        conn.commit()
+        conn.close()
+        return self.json({"ok": True, "request": row("select * from certificate_requests where id = ?", (request_id,))})
+
     def review_student_leave_request(self, request_id: str, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_portal_review", "学生申請の審査は staff / 入管担当 / manager のみ実行できます。"):
+            return
         leave_request = row("select * from student_leave_requests where id = ?", (request_id,))
         if not leave_request:
             return self.json_error("NOT_FOUND", "申請が見つかりません。", status=404)
@@ -3573,21 +5532,53 @@ class Handler(BaseHTTPRequestHandler):
             if existing_record:
                 cur.execute(
                     """
-                    update student_attendance_records
-                    set status = ?, attendance_minutes = ?, scheduled_minutes = ?, note = ?
+                    update student_leave_requests
+                    set created_attendance_record_id = ?,
+                        original_attendance_status = ?,
+                        original_attendance_minutes = ?,
+                        original_scheduled_minutes = ?,
+                        original_attendance_note = ?
                     where id = ?
                     """,
-                    (leave_request["request_type"], scheduled_minutes, scheduled_minutes, note, existing_record["id"]),
+                    (
+                        existing_record["id"],
+                        existing_record["status"],
+                        existing_record["attendance_minutes"],
+                        existing_record["scheduled_minutes"],
+                        existing_record["note"],
+                        request_id,
+                    ),
+                )
+                cur.execute(
+                    """
+                    update student_attendance_records
+                    set status = ?, attendance_minutes = ?, scheduled_minutes = ?, note = ?, source_request_id = ?
+                    where id = ?
+                    """,
+                    (leave_request["request_type"], scheduled_minutes, scheduled_minutes, note, request_id, existing_record["id"]),
                 )
             else:
+                attendance_record_id = new_id()
+                cur.execute(
+                    """
+                    update student_leave_requests
+                    set created_attendance_record_id = ?,
+                        original_attendance_status = null,
+                        original_attendance_minutes = null,
+                        original_scheduled_minutes = null,
+                        original_attendance_note = null
+                    where id = ?
+                    """,
+                    (attendance_record_id, request_id),
+                )
                 cur.execute(
                     """
                     insert into student_attendance_records
-                    (id, student_id, class_date, period_label, status, attendance_minutes, scheduled_minutes, note, created_at)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, student_id, class_date, period_label, status, attendance_minutes, scheduled_minutes, note, created_at, source_request_id)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        new_id(),
+                        attendance_record_id,
                         leave_request["student_id"],
                         leave_request["request_date"],
                         leave_request.get("period_label") or "",
@@ -3596,14 +5587,57 @@ class Handler(BaseHTTPRequestHandler):
                         scheduled_minutes,
                         note,
                         now_iso(),
+                        request_id,
                     ),
                 )
+        elif new_status == "差戻し" and leave_request["status"] == "承認済":
+            created_record_id = leave_request.get("created_attendance_record_id") or ""
+            if created_record_id:
+                attendance_record = cur.execute(
+                    "select * from student_attendance_records where id = ?",
+                    (created_record_id,),
+                ).fetchone()
+                if attendance_record and attendance_record["source_request_id"] == request_id:
+                    if leave_request.get("original_attendance_status") is not None:
+                        cur.execute(
+                            """
+                            update student_attendance_records
+                            set status = ?, attendance_minutes = ?, scheduled_minutes = ?, note = ?, source_request_id = null
+                            where id = ?
+                            """,
+                            (
+                                leave_request.get("original_attendance_status") or "",
+                                leave_request.get("original_attendance_minutes") or 0,
+                                leave_request.get("original_scheduled_minutes") or 0,
+                                leave_request.get("original_attendance_note") or "",
+                                created_record_id,
+                            ),
+                        )
+                    else:
+                        cur.execute("delete from student_attendance_records where id = ?", (created_record_id,))
+            else:
+                fallback_record = cur.execute(
+                    """
+                    select * from student_attendance_records
+                    where student_id = ? and class_date = ? and period_label = ? and status = ?
+                    """,
+                    (
+                        leave_request["student_id"],
+                        leave_request["request_date"],
+                        leave_request.get("period_label") or "",
+                        leave_request["request_type"],
+                    ),
+                ).fetchone()
+                if fallback_record:
+                    cur.execute("delete from student_attendance_records where id = ?", (fallback_record["id"],))
         write_audit(cur, "student.leave_review", "student", leave_request["student_id"], f"{leave_request['request_type']}申請を {new_status} に更新しました。")
         conn.commit()
         conn.close()
         return self.json({"ok": True})
 
     def create_student_bulletin(self, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_portal_review", "掲示板の掲載は staff / 入管担当 / manager のみ実行できます。"):
+            return
         title = (body.get("title") or "").strip()
         message = (body.get("body") or "").strip()
         scope = (body.get("scope") or "all").strip()
@@ -3628,6 +5662,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"ok": True})
 
     def toggle_student_bulletin_pin(self, bulletin_id: str, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_portal_review", "掲示板の置頂操作は staff / 入管担当 / manager のみ実行できます。"):
+            return
         bulletin = row("select * from student_bulletin_posts where id = ?", (bulletin_id,))
         if not bulletin:
             return self.json_error("NOT_FOUND", "掲示が見つかりません。", status=404)
@@ -3641,6 +5677,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"ok": True})
 
     def create_admin_group_message(self, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_portal_review", "学生向けメッセージ送信は staff / 入管担当 / manager のみ実行できます。"):
+            return
         class_name = (body.get("class_name") or "").strip()
         message = (body.get("message") or "").strip()
         if not class_name or not message:
@@ -3661,6 +5699,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"ok": True})
 
     def delete_group_message(self, message_id: str) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_portal_review", "クラスメッセージ削除は staff / 入管担当 / manager のみ実行できます。"):
+            return
         message = row("select * from class_group_messages where id = ?", (message_id,))
         if not message:
             return self.json_error("NOT_FOUND", "メッセージが見つかりません。", status=404)
@@ -3673,6 +5713,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"ok": True})
 
     def review_student_homework_submission(self, submission_id: str, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_portal_review", "課題提出のレビューは staff / 入管担当 / manager のみ実行できます。"):
+            return
         submission = row("select * from student_homework_submissions where id = ?", (submission_id,))
         if not submission:
             return self.json_error("NOT_FOUND", "提出物が見つかりません。", status=404)
@@ -3701,6 +5743,124 @@ class Handler(BaseHTTPRequestHandler):
         conn.commit()
         conn.close()
         return self.json({"ok": True})
+
+    def review_student_profile_change_request(self, request_id: str, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_portal_review", "個人情報変更申請の審査は staff / 入管担当 / manager のみ実行できます。"):
+            return
+        change_request = row("select * from student_profile_change_requests where id = ?", (request_id,))
+        if not change_request:
+            return self.json_error("NOT_FOUND", "変更申請が見つかりません。", status=404)
+        new_status = (body.get("status") or "").strip()
+        reviewed_note = (body.get("reviewed_note") or "").strip()
+        if new_status not in {"反映済", "差戻し"}:
+            return self.json_error("VALIDATION_ERROR", "状態が不正です。", status=422)
+        conn = connect()
+        cur = conn.cursor()
+        if new_status == "反映済":
+            cur.execute(
+                """
+                update students
+                set phone = ?,
+                    address_japan = ?,
+                    emergency_contact = ?
+                where id = ?
+                """,
+                (
+                    change_request.get("requested_phone") or "",
+                    change_request.get("requested_address_japan") or "",
+                    change_request.get("requested_emergency_contact") or "",
+                    change_request["student_id"],
+                ),
+            )
+        cur.execute(
+            """
+            update student_profile_change_requests
+            set status = ?, reviewed_note = ?, reviewed_at = ?
+            where id = ?
+            """,
+            (new_status, reviewed_note, now_iso(), request_id),
+        )
+        write_audit(
+            cur,
+            "student.profile_change_review",
+            "student",
+            change_request["student_id"],
+            f"個人情報変更申請を {new_status} に更新しました。",
+        )
+        conn.commit()
+        conn.close()
+        return self.json({"ok": True})
+
+    def review_student_residence_change_request(self, request_id: str, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "student_portal_review", "在留情報変更申請の審査は staff / 入管担当 / manager のみ実行できます。"):
+            return
+        change_request = row("select * from student_residence_change_requests where id = ?", (request_id,))
+        if not change_request:
+            return self.json_error("NOT_FOUND", "在留情報変更申請が見つかりません。", status=404)
+        new_status = (body.get("status") or "").strip()
+        reviewed_note = (body.get("reviewed_note") or "").strip()
+        if new_status not in {"反映済", "差戻し"}:
+            return self.json_error("VALIDATION_ERROR", "状態が不正です。", status=422)
+        conn = connect()
+        cur = conn.cursor()
+        if new_status == "反映済":
+            cur.execute(
+                """
+                update students
+                set residence_status = ?,
+                    residence_card_no = ?,
+                    residence_expiry = ?,
+                    passport_no = ?
+                where id = ?
+                """,
+                (
+                    change_request.get("requested_residence_status") or "",
+                    change_request.get("requested_residence_card_no") or "",
+                    change_request.get("requested_residence_expiry") or "",
+                    change_request.get("requested_passport_no") or "",
+                    change_request["student_id"],
+                ),
+            )
+        cur.execute(
+            """
+            update student_residence_change_requests
+            set status = ?, reviewed_note = ?, reviewed_at = ?
+            where id = ?
+            """,
+            (new_status, reviewed_note, now_iso(), request_id),
+        )
+        write_audit(
+            cur,
+            "student.residence_change_review",
+            "student",
+            change_request["student_id"],
+            f"在留情報変更申請を {new_status} に更新しました。",
+        )
+        conn.commit()
+        conn.close()
+        return self.json({"ok": True})
+
+    def serve_residence_change_file(self, request_id: str, kind: str, session_token: str, public: bool = False) -> None:
+        change_request = row("select * from student_residence_change_requests where id = ?", (request_id,))
+        if not change_request:
+            self.send_error(404)
+            return
+        if kind == "residence-card":
+            path_value = change_request.get("residence_card_file_path") or ""
+        elif kind == "passport":
+            path_value = change_request.get("passport_file_path") or ""
+        else:
+            self.send_error(404)
+            return
+        if not path_value:
+            self.send_error(404)
+            return
+        if public:
+            student = self.student_by_session_token(session_token)
+            if not student or student["id"] != change_request["student_id"]:
+                self.send_error(403)
+                return
+        return self.serve_file(Path(path_value))
 
     def annual_result_source(self, result_id: str) -> dict | None:
         advancement = row("select * from student_advancement_results where id = ?", (result_id,))
@@ -4709,6 +6869,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json(coe_materials(coe_id))
 
     def issue_receipt(self, payment_id: str) -> None:
+        if not self.require_staff_permission(self.current_staff(), "receipt_issue", "領収書の発行は staff / 入管担当 / manager のみ実行できます。"):
+            return
         payment = row(
             """
             select p.*, a.admission_term
@@ -5249,6 +7411,8 @@ class Handler(BaseHTTPRequestHandler):
         return result
 
     def export_semiannual_attendance_report(self, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "immigration_generate", "入管報告の出力は入管担当または manager のみ実行できます。"):
+            return
         report_period = body.get("period") or self.default_semiannual_period()
         document = self.ensure_semiannual_attendance_document(report_period)
         export_key = f"semiannual_attendance:{report_period}:{document['document_no']}"
@@ -5261,6 +7425,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"document": document, "export": result})
 
     def export_semiannual_attendance_detail_report(self, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "immigration_generate", "入管報告の出力は入管担当または manager のみ実行できます。"):
+            return
         report_period = body.get("period") or self.default_semiannual_period()
         document = self.ensure_semiannual_attendance_document(report_period)
         export_key = f"semiannual_attendance_detail:{report_period}:{document['document_no']}"
@@ -5273,6 +7439,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"document": document, "export": result})
 
     def export_may_november_report(self, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "immigration_generate", "入管報告の出力は入管担当または manager のみ実行できます。"):
+            return
         report_period = body.get("period") or self.default_may_november_period()
         document = self.ensure_may_november_document(report_period)
         export_key = f"may_november:{report_period}:{document['document_no']}"
@@ -5285,6 +7453,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"document": document, "export": result})
 
     def export_residence_renewal_report(self) -> None:
+        if not self.require_staff_permission(self.current_staff(), "immigration_generate", "入管報告の出力は入管担当または manager のみ実行できます。"):
+            return
         document = self.ensure_residence_renewal_document()
         export_key = f"residence_renewal:residence-renewal:{document['document_no']}"
         cached = cached_export(export_key)
@@ -5296,6 +7466,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"document": document, "export": result})
 
     def export_residence_renewal_form(self, student_id: str) -> None:
+        if not self.require_staff_permission(self.current_staff(), "immigration_generate", "入管報告の出力は入管担当または manager のみ実行できます。"):
+            return
         student = row("select * from students where id = ?", (student_id,))
         if not student:
             return self.json_error("NOT_FOUND", "学生が見つかりません。", status=404)
@@ -5312,6 +7484,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"document": document, "export": result})
 
     def export_poor_attendance_report(self) -> None:
+        if not self.require_staff_permission(self.current_staff(), "immigration_generate", "入管報告の出力は入管担当または manager のみ実行できます。"):
+            return
         document = self.ensure_poor_attendance_document()
         export_key = f"poor_attendance:poor-attendance:{document['document_no']}"
         cached = cached_export(export_key)
@@ -5323,6 +7497,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"document": document, "export": result})
 
     def export_annual_completion_report(self) -> None:
+        if not self.require_staff_permission(self.current_staff(), "immigration_generate", "入管報告の出力は入管担当または manager のみ実行できます。"):
+            return
         document = self.ensure_annual_completion_document()
         export_key = f"annual_completion:annual-completion:{document['document_no']}"
         cached = cached_export(export_key)
@@ -5334,6 +7510,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json({"document": document, "export": result})
 
     def export_annual_completion_list(self) -> None:
+        if not self.require_staff_permission(self.current_staff(), "immigration_generate", "入管報告の出力は入管担当または manager のみ実行できます。"):
+            return
         document = self.ensure_annual_completion_document()
         export_key = f"annual_completion_list:annual-completion:{document['document_no']}"
         cached = cached_export(export_key)
@@ -5409,6 +7587,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.json(row("select * from ai_check_issues where id = ?", (issue_id,)))
 
     def submit_immigration(self, coe_id: str, body: dict) -> None:
+        if not self.require_staff_permission(self.current_staff(), "immigration_submit", "入管提出の記録は入管担当または manager のみ実行できます。"):
+            return
         coe = row("select * from coe_cases where id = ?", (coe_id,))
         if not coe:
             return self.json_error("NOT_FOUND", "COE案件が見つかりません。", status=404)
@@ -5511,15 +7691,33 @@ class Handler(BaseHTTPRequestHandler):
     def json_error(self, code: str, message: str, details: dict | None = None, status: int = 400) -> None:
         return self.json({"error": {"code": code, "message": message, "details": details or {}}}, status)
 
+    def serve_export_file(self, filename: str, access_token: str) -> None:
+        export = row(
+            "select * from export_files where file_path = ? or file_path like ?",
+            (str(EXPORT_DIR / filename), f"%/{filename}"),
+        )
+        if not export:
+            self.send_error(404)
+            return
+        if not access_token or access_token != (export.get("access_token") or ""):
+            self.send_error(403)
+            return
+        return self.serve_file(Path(export["file_path"]))
+
     def serve_file(self, path: Path) -> None:
         if not path.exists() or not path.is_file():
             self.send_error(404)
             return
         content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         data = path.read_bytes()
+        is_static_asset = path.parent == STATIC_DIR or STATIC_DIR in path.parents
         self.send_response(200)
         self.send_header("content-type", content_type)
         self.send_header("content-length", str(len(data)))
+        if is_static_asset:
+            self.send_header("cache-control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("pragma", "no-cache")
+            self.send_header("expires", "0")
         self.end_headers()
         self.wfile.write(data)
 

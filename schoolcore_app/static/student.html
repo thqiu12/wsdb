@@ -4,10 +4,73 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>学生マイページ | SchoolCore</title>
-  <link rel="stylesheet" href="/static/student.css">
+  <link rel="stylesheet" href="/static/student.css?v=202605081930">
 </head>
 <body>
   <main class="student-portal">
+    <div id="studentPortalShell">
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="hero-kicker">学生ポータル</div>
+          <h1>学生マイページ</h1>
+          <p>学生番号とパスワードでログインすると、在籍情報の確認と証明書申請ができます。</p>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-card">
+            <strong>確認できる内容</strong>
+            <span>在籍・在留・連絡先</span>
+          </div>
+          <div class="meta-card">
+            <strong>証明書申請</strong>
+            <span>出席率・成績・修了</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="auth-tabs">
+          <button class="auth-tab active" type="button" data-auth-mode="login">ログイン</button>
+          <button class="auth-tab" type="button" data-auth-mode="setup">初回パスワード設定</button>
+        </div>
+
+        <form id="studentLoginForm" class="lookup-form" onsubmit="return false;">
+          <label>
+            学生番号
+            <input name="login_id" placeholder="例: 202604125" required>
+          </label>
+          <label>
+            パスワード
+            <input type="password" name="password" placeholder="パスワード" required>
+          </label>
+          <button class="primary-btn" id="studentLoginButton" type="button">ログインする</button>
+        </form>
+
+        <form id="studentSetupForm" class="lookup-form hidden" onsubmit="return false;">
+          <label>
+            学生番号
+            <input name="student_no" placeholder="例: 202604125" required>
+          </label>
+          <label>
+            生年月日
+            <input type="date" name="birth_date" required>
+          </label>
+          <label>
+            新しいパスワード
+            <input type="password" name="password" placeholder="8文字以上" required>
+          </label>
+          <label>
+            パスワード確認
+            <input type="password" name="password_confirm" placeholder="もう一度入力" required>
+          </label>
+          <button class="primary-btn" id="studentSetupButton" type="button">設定してログイン</button>
+        </form>
+      </section>
+    </div>
+
+    <section id="studentPortalContent" class="content hidden"></section>
+  </main>
+
+  <template id="studentPortalShellTemplate">
     <section class="hero">
       <div class="hero-copy">
         <div class="hero-kicker">学生ポータル</div>
@@ -32,7 +95,7 @@
         <button class="auth-tab" type="button" data-auth-mode="setup">初回パスワード設定</button>
       </div>
 
-      <form id="studentLoginForm" class="lookup-form">
+      <form id="studentLoginForm" class="lookup-form" onsubmit="return false;">
         <label>
           学生番号
           <input name="login_id" placeholder="例: 202604125" required>
@@ -41,10 +104,10 @@
           パスワード
           <input type="password" name="password" placeholder="パスワード" required>
         </label>
-        <button class="primary-btn" type="submit">ログインする</button>
+        <button class="primary-btn" id="studentLoginButton" type="button">ログインする</button>
       </form>
 
-      <form id="studentSetupForm" class="lookup-form hidden">
+      <form id="studentSetupForm" class="lookup-form hidden" onsubmit="return false;">
         <label>
           学生番号
           <input name="student_no" placeholder="例: 202604125" required>
@@ -61,12 +124,76 @@
           パスワード確認
           <input type="password" name="password_confirm" placeholder="もう一度入力" required>
         </label>
-        <button class="primary-btn" type="submit">設定してログイン</button>
+        <button class="primary-btn" id="studentSetupButton" type="button">設定してログイン</button>
       </form>
     </section>
+  </template>
+  <script>
+    (() => {
+      const APP_URL = "/student?v=202605081930";
+      const STORAGE_KEY = "studentPortalBootstrap";
 
-    <section id="studentPortalContent" class="content hidden"></section>
-  </main>
-  <script src="/static/student.js"></script>
+      function toggleAuthMode(mode) {
+        document.querySelectorAll("[data-auth-mode]").forEach((button) => {
+          button.classList.toggle("active", button.dataset.authMode === mode);
+        });
+        document.querySelectorAll("#studentLoginForm").forEach((form) => {
+          form.classList.toggle("hidden", mode !== "login");
+        });
+        document.querySelectorAll("#studentSetupForm").forEach((form) => {
+          form.classList.toggle("hidden", mode !== "setup");
+        });
+      }
+
+      async function submitAuth(url, formId, buttonId, loadingText) {
+        const form = document.getElementById(formId);
+        const button = document.getElementById(buttonId);
+        if (!form || !button) return;
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = loadingText;
+        try {
+          const payload = Object.fromEntries(new FormData(form).entries());
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data?.error?.message || "ログインに失敗しました。");
+          }
+          window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          window.location.href = APP_URL;
+        } catch (error) {
+          alert(error.message || "ログインに失敗しました。");
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
+
+      document.addEventListener("click", (event) => {
+        const authModeButton = event.target.closest?.("[data-auth-mode]");
+        if (authModeButton) {
+          event.preventDefault();
+          toggleAuthMode(authModeButton.dataset.authMode);
+          return;
+        }
+        const loginButton = event.target.closest?.("#studentLoginButton");
+        if (loginButton) {
+          event.preventDefault();
+          submitAuth("/api/public/student-login", "studentLoginForm", "studentLoginButton", "ログイン中...");
+          return;
+        }
+        const setupButton = event.target.closest?.("#studentSetupButton");
+        if (setupButton) {
+          event.preventDefault();
+          submitAuth("/api/public/student-password/setup", "studentSetupForm", "studentSetupButton", "設定中...");
+        }
+      });
+    })();
+  </script>
+  <script src="/static/student.js?v=202605081930"></script>
 </body>
 </html>
